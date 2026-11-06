@@ -1,6 +1,7 @@
 package com.example.myapplication.activites
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -85,8 +86,11 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         return songs
     }
 
-
     override fun onItemClick(position: Int) {
-        TODO("Not yet implemented")
+        val intent = Intent(this, PlayerActivity::class.java).apply {
+            putExtra("songList", ArrayList(songList))
+            putExtra("position", position)
+        }
+        startActivity(intent)
     }
 }
