@@ -10,7 +10,6 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import com.bumptech.glide.Glide
-import com.bumptech.glide.request.RequestOptions.bitmapTransform
 import com.example.myapplication.R
 import com.example.myapplication.databinding.ActivityPlayerBinding
 import com.example.myapplication.model.Song
@@ -19,7 +18,6 @@ import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
-import jp.wasabeef.glide.transformations.BlurTransformation
 import java.io.InputStream
 import java.util.Locale
 import kotlin.random.Random
@@ -76,6 +74,7 @@ class PlayerActivity : AppCompatActivity() {
 
         songList = songs
         shuffledList = songList.toMutableList()
+        binding.waveformSeekBar.setWaveProgressColor(getColor(R.color.white))
         binding.waveformSeekBar.setWaveform(createWaveform())
         setupControls()
         initializePlayer(currentIndex)
@@ -192,6 +191,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun updateUI(song: Song) {
         binding.textTitle1.text = song.title ?: ""
+        binding.textTitle1.isSelected = true
         binding.textArtist.text = song.artist ?: ""
         title = song.title
 
@@ -201,21 +201,11 @@ class PlayerActivity : AppCompatActivity() {
             Glide.with(this)
                 .asBitmap()
                 .load(albumArtUri)
-                .circleCrop()
+                .centerCrop()
                 .placeholder(R.drawable.baseline_music_note_24)
                 .into(binding.imageAlbumArtPlayer)
-
-            Glide.with(this)
-                .load(albumArtUri)
-                .apply(bitmapTransform(BlurTransformation(25, 3)))
-                .placeholder(R.drawable.baseline_music_note_24)
-                .error(R.drawable.baseline_music_note_24)
-                .into(binding.BgAlbumArt)
         } else {
-            binding.apply {
-                imageAlbumArtPlayer.setImageResource(R.drawable.baseline_music_note_24)
-                BgAlbumArt.setImageResource(R.drawable.baseline_music_note_24)
-            }
+            binding.imageAlbumArtPlayer.setImageResource(R.drawable.baseline_music_note_24)
         }
     }
 

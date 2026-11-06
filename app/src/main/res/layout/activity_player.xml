@@ -5,49 +5,32 @@
     android:id="@+id/PlayerRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/black"
     tools:context=".activites.PlayerActivity">
 
     <ImageView
-        android:id="@+id/BgAlbumArt"
+        android:id="@+id/imageAlbumArtPlayer"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:alpha="0.7"
-        android:scaleType="centerCrop"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        />
-
-    <View
-        android:id="@+id/view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/gradient_bg"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
-    <ImageView
-        android:id="@+id/imageAlbumArtPlayer"
-        android:layout_width="320dp"
-        android:layout_height="320dp"
+        android:layout_marginStart="32dp"
         android:layout_marginTop="16dp"
-        android:background="@drawable/circle_bg"
+        android:layout_marginEnd="32dp"
         android:scaleType="centerCrop"
+        app:layout_constraintBottom_toTopOf="@+id/textTitle1"
+        app:layout_constraintDimensionRatio="1:1"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHeight_max="320dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/linearLayout"
-         />
+        app:layout_constraintWidth_max="320dp" />
 
     <LinearLayout
         android:id="@+id/linearLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
+        android:layout_marginStart="20dp"
         android:layout_marginTop="60dp"
-        android:layout_marginEnd="16dp"
+        android:layout_marginEnd="20dp"
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -56,9 +39,10 @@
         <ImageView
             android:id="@+id/backBtn"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:tint="@color/white"
-            app:srcCompat="@drawable/back" />
+            android:layout_height="32dp"
+            android:padding="4dp"
+            app:srcCompat="@drawable/baseline_arrow_back_ios_24"
+            app:tint="@color/white" />
 
         <Space
             android:layout_width="wrap_content"
@@ -67,45 +51,62 @@
 
         <ImageView
             android:id="@+id/favBtn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:tint="@color/white"
-            app:srcCompat="@drawable/fav_icon" />
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:padding="4dp"
+            app:srcCompat="@drawable/baseline_favorite_border_24"
+            app:tint="@color/white" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/textTitle1"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="32dp"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="32dp"
+        android:ellipsize="marquee"
+        android:gravity="center"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:scrollHorizontally="true"
+        android:singleLine="true"
         android:text="title"
-        android:textSize="30sp"
         android:textColor="@color/white"
+        android:textSize="30sp"
         android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="@+id/imageAlbumArtPlayer"
-        app:layout_constraintStart_toStartOf="@+id/imageAlbumArtPlayer"
+        app:layout_constraintBottom_toTopOf="@+id/textArtist"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/imageAlbumArtPlayer" />
 
     <TextView
         android:id="@+id/textArtist"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
         android:layout_marginTop="8dp"
+        android:layout_marginEnd="32dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
         android:text="Artist"
+        android:textColor="@color/white"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="@color/white"
-        app:layout_constraintEnd_toEndOf="@+id/textTitle1"
-        app:layout_constraintStart_toStartOf="@+id/textTitle1"
+        app:layout_constraintBottom_toTopOf="@+id/waveformSeekBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textTitle1" />
 
     <com.frolo.waveformseekbar.WaveformSeekBar
         android:id="@+id/waveformSeekBar"
         android:layout_width="0dp"
-        android:layout_height="70dp"
+        android:layout_height="64dp"
         android:layout_marginStart="32dp"
-        android:layout_marginTop="24dp"
+        android:layout_marginTop="16dp"
         android:layout_marginEnd="32dp"
+        app:waveProgressColor="@color/white"
+        app:layout_constraintBottom_toTopOf="@+id/textElapsed"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textArtist" />
@@ -114,12 +115,11 @@
         android:id="@+id/textElapsed"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         android:text="0:00"
         android:textColor="@color/white"
         android:textSize="13sp"
         android:textStyle="bold"
-
         app:layout_constraintStart_toStartOf="@+id/waveformSeekBar"
         app:layout_constraintTop_toBottomOf="@+id/waveformSeekBar" />
 
@@ -127,23 +127,25 @@
         android:id="@+id/textDuration"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="8dp"
         android:text="0:00"
         android:textColor="@color/white"
-        android:textStyle="bold"
         android:textSize="13sp"
+        android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="@+id/waveformSeekBar"
         app:layout_constraintTop_toBottomOf="@+id/waveformSeekBar" />
 
     <LinearLayout
+        android:id="@+id/controlsLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="60dp"
-        android:orientation="horizontal"
         android:gravity="center"
+        android:orientation="horizontal"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/textElapsed">
 
         <ImageView
             android:id="@+id/buttonRepeat"
@@ -192,4 +194,15 @@
             app:srcCompat="@drawable/baseline_shuffle_24"
             app:tint="@color/white" />
     </LinearLayout>
+
+    <androidx.constraintlayout.widget.Guideline
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintGuide_end="791dp" />
+
+    <androidx.constraintlayout.widget.Guideline
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintGuide_end="823dp" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>
