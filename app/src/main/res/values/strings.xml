@@ -3,4 +3,5 @@
     <string name="explorer_artist">Explorer Artist</string>
     <string name="song_title">Song Title</string>
     <string name="artist">Artist</string>
+    <string name="device_files">Device Files</string>
 </resources>
