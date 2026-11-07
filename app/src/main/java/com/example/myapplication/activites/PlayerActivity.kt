@@ -1,10 +1,15 @@
 package com.example.myapplication.activites
 
+import android.content.ComponentName
 import android.content.ContentUris
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.PorterDuff
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -13,6 +18,7 @@ import com.bumptech.glide.Glide
 import com.example.myapplication.R
 import com.example.myapplication.databinding.ActivityPlayerBinding
 import com.example.myapplication.model.Song
+import com.example.myapplication.service.AudioService
 import com.frolo.waveformseekbar.WaveformSeekBar
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
@@ -23,28 +29,97 @@ import java.util.Locale
 import kotlin.random.Random
 
 class PlayerActivity : AppCompatActivity() {
-    private var player: ExoPlayer? = null
+    private var audioService: AudioService? = null
+    private var isBound = false
+    private val player: ExoPlayer? get() = audioService?.player
+
     private lateinit var binding: ActivityPlayerBinding
     private var songList: List<Song> = mutableListOf()
-    private var shuffledList: MutableList<Song> = mutableListOf()
     private var currentIndex = 0
-    private var isShuffle = false
-    private var isRepeat = false
+    private var wasPlayingBeforeTracking = false
     private val handle = Handler(Looper.getMainLooper())
+
+    private val playerListener = object : Player.Listener {
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            updatePlayPauseButtonOnIcon()
+            if (playbackState == Player.STATE_READY) {
+                player?.let { p ->
+                    binding.textDuration.text = formatTime((p.duration / 1000).toInt())
+                }
+                handle.postDelayed(updateRunnable, 0)
+            }
+        }
+
+        override fun onIsPlayingChanged(isPlaying: Boolean) {
+            updatePlayPauseButtonOnIcon()
+        }
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            updatePlayPauseButtonOnIcon()
+            updateRepeatShuffleIcons()
+            audioService?.getCurrentSong()?.let { updateUI(it) }
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            Toast.makeText(this@PlayerActivity, "Error playing song: ${error.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val stateListener = {
+        runOnUiThread {
+            updatePlayPauseButtonOnIcon()
+            updateRepeatShuffleIcons()
+            audioService?.getCurrentSong()?.let { updateUI(it) }
+        }
+    }
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as AudioService.AudioBinder
+            val srv = binder.getService()
+            audioService = srv
+            isBound = true
+
+            srv.songList = songList
+            if (!srv.isShuffle) {
+                srv.shuffledList = songList.toMutableList()
+            }
+            srv.player?.addListener(playerListener)
+            srv.addStateChangeListener(stateListener)
+
+            val currentPlayingSong = srv.getCurrentSong()
+            val targetSong = if (currentIndex in songList.indices) songList[currentIndex] else null
+
+            if (currentPlayingSong == null || targetSong == null || currentPlayingSong.id != targetSong.id) {
+                srv.playSongAtIndex(currentIndex)
+            }
+
+            srv.getCurrentSong()?.let { updateUI(it) }
+            updatePlayPauseButtonOnIcon()
+            updateRepeatShuffleIcons()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            audioService?.removeStateChangeListener(stateListener)
+            audioService?.player?.removeListener(playerListener)
+            audioService = null
+            isBound = false
+        }
+    }
 
     private val updateRunnable = object : Runnable {
         override fun run() {
-            player?.let {
-                if (it.isPlaying) {
-                    val currentPosition = it.currentPosition
-                    val duration = it.duration
+            player?.let { p ->
+                if (p.isPlaying) {
+                    val currentPosition = p.currentPosition
+                    val duration = p.duration
                     if (duration > 0) {
                         val progressPercent = currentPosition.toFloat() / duration
                         binding.waveformSeekBar.setProgressInPercentage(progressPercent)
                         binding.textElapsed.text = formatTime((currentPosition / 1000).toInt())
                         binding.textDuration.text = formatTime((duration / 1000).toInt())
                     }
-                    handle.postDelayed(this, 1000)
+                    handle.postDelayed(this, 30)
                 }
             }
         }
@@ -73,11 +148,13 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         songList = songs
-        shuffledList = songList.toMutableList()
         binding.waveformSeekBar.setWaveProgressColor(getColor(R.color.white))
         binding.waveformSeekBar.setWaveform(createWaveform())
         setupControls()
-        initializePlayer(currentIndex)
+
+        val serviceIntent = Intent(this, AudioService::class.java)
+        startService(serviceIntent)
+        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
     private fun setupControls() {
@@ -97,41 +174,51 @@ class PlayerActivity : AppCompatActivity() {
                     if (fromUser) {
                         player?.let { p ->
                             val duration = p.duration
-                            val seekpos = (percent * duration).toLong()
-                            p.seekTo(seekpos)
-                            textElapsed.text = formatTime((seekpos / 1000).toInt())
+                            if (duration > 0) {
+                                val seekpos = (percent * duration).toLong()
+                                p.seekTo(seekpos)
+                                textElapsed.text = formatTime((seekpos / 1000).toInt())
+                            }
                         }
                     }
                 }
 
                 override fun onStartTrackingTouch(seekBar: WaveformSeekBar?) {
+                    wasPlayingBeforeTracking = player?.isPlaying == true
+                    player?.pause()
                     handle.removeCallbacks(updateRunnable)
+                    updatePlayPauseButtonOnIcon()
                 }
 
                 override fun onStopTrackingTouch(seekBar: WaveformSeekBar?) {
-                    handle.postDelayed(updateRunnable, 0)
+                    if (wasPlayingBeforeTracking) {
+                        player?.play()
+                        handle.postDelayed(updateRunnable, 0)
+                    }
+                    updatePlayPauseButtonOnIcon()
                 }
             })
         }
     }
 
     private fun togglePlayPause() {
-        player?.let {
-            if (it.isPlaying) {
-                it.pause()
-                handle.removeCallbacks(updateRunnable)
-            } else {
-                it.play()
-                handle.postDelayed(updateRunnable, 0)
-            }
-            updatePlayPauseButtonOnIcon()
-        }
+        audioService?.togglePlayPause()
+        updatePlayPauseButtonOnIcon()
     }
 
     private fun toggleRepeat() {
-        isRepeat = !isRepeat
-        player?.repeatMode = if (isRepeat) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-        if (isRepeat) {
+        audioService?.toggleRepeat()
+        updateRepeatShuffleIcons()
+    }
+
+    private fun toggleShuffle() {
+        audioService?.toggleShuffle()
+        updateRepeatShuffleIcons()
+    }
+
+    private fun updateRepeatShuffleIcons() {
+        val srv = audioService ?: return
+        if (srv.isRepeat) {
             binding.buttonRepeat.setColorFilter(
                 getColor(R.color.purple_500),
                 PorterDuff.Mode.SRC_IN
@@ -139,59 +226,23 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             binding.buttonRepeat.clearColorFilter()
         }
-    }
 
-    private fun toggleShuffle() {
-        isShuffle = !isShuffle
-        if (isShuffle) {
-            shuffledList.shuffle()
+        if (srv.isShuffle) {
             binding.ButtonSuffle.setColorFilter(
                 getColor(R.color.purple_500),
                 PorterDuff.Mode.SRC_IN
             )
         } else {
-            shuffledList = songList.toMutableList()
             binding.ButtonSuffle.clearColorFilter()
         }
     }
 
-    private fun initializePlayer(index: Int) {
-        val song = if (isShuffle) shuffledList[index] else songList[index]
-        player?.release()
-
-        player = ExoPlayer.Builder(this).build().apply {
-            repeatMode = if (isRepeat) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-            addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    updatePlayPauseButtonOnIcon()
-                    if (playbackState == Player.STATE_READY) {
-                        binding.textDuration.text = formatTime((duration / 1000).toInt())
-                        handle.postDelayed(updateRunnable, 0)
-                    } else if (playbackState == Player.STATE_ENDED) {
-                        playNext()
-                    }
-                }
-
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    updatePlayPauseButtonOnIcon()
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    Toast.makeText(this@PlayerActivity, "Error playing song: ${error.message}", Toast.LENGTH_SHORT).show()
-                }
-            })
-
-            setMediaItem(MediaItem.fromUri(song.data ?: ""))
-            prepare()
-            play()
-        }
-        updatePlayPauseButtonOnIcon()
-        updateUI(song)
-    }
-
     private fun updateUI(song: Song) {
-        binding.textTitle1.text = song.title ?: ""
-        binding.textTitle1.isSelected = true
+        val newTitle = song.title ?: ""
+        if (binding.textTitle1.text != newTitle) {
+            binding.textTitle1.text = newTitle
+            binding.textTitle1.isSelected = true
+        }
         binding.textArtist.text = song.artist ?: ""
         title = song.title
 
@@ -227,31 +278,34 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun createWaveform(): IntArray {
         val random = Random(System.currentTimeMillis())
-        return IntArray(50) { 5 + random.nextInt(50) }
+        return IntArray(120) { 5 + random.nextInt(50) }
     }
 
     private fun updatePlayPauseButtonOnIcon() {
+        val isPlaying = player?.let { it.isPlaying || (it.playWhenReady && it.playbackState != Player.STATE_ENDED) } == true
         binding.buttonPlay.setImageResource(
-            if (player?.isPlaying == true) R.drawable.baseline_pause_24 else R.drawable.baseline_play_arrow_24
+            if (isPlaying) R.drawable.baseline_pause_24 else R.drawable.baseline_play_arrow_24
         )
     }
 
     private fun playNext() {
-        val size = if (isShuffle) shuffledList.size else songList.size
-        currentIndex = (currentIndex + 1) % size
-        initializePlayer(currentIndex)
+        audioService?.playNext()
+        audioService?.getCurrentSong()?.let { updateUI(it) }
     }
 
     private fun playPrevious() {
-        val size = if (isShuffle) shuffledList.size else songList.size
-        currentIndex = (currentIndex - 1 + size) % size
-        initializePlayer(currentIndex)
+        audioService?.playPrevious()
+        audioService?.getCurrentSong()?.let { updateUI(it) }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         handle.removeCallbacks(updateRunnable)
-        player?.release()
-        player = null
+        if (isBound) {
+            audioService?.removeStateChangeListener(stateListener)
+            audioService?.player?.removeListener(playerListener)
+            unbindService(serviceConnection)
+            isBound = false
+        }
     }
 }
