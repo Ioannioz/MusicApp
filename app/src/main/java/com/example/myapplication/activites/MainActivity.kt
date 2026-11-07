@@ -1,21 +1,31 @@
 package com.example.myapplication.activites
 
 import android.Manifest
+import android.app.RecoverableSecurityException
 import android.content.ComponentName
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.MediaStore
+import android.view.Gravity
 import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -26,14 +36,51 @@ import com.example.myapplication.databinding.ActivityMainBinding
 import com.example.myapplication.model.Song
 import com.example.myapplication.service.AudioService
 import com.google.android.exoplayer2.Player
+import java.io.File
 
-class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
+class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongAdapter.OnItemLongClickListener {
     private lateinit var binding: ActivityMainBinding
     private lateinit var adapter: SongAdapter
     private var songList: List<Song> = mutableListOf()
 
     private var audioService: AudioService? = null
     private var isBound = false
+
+    private var tempSelectedImageUri: Uri? = null
+    private var activeDialogCoverPreview: ImageView? = null
+
+    private val pickImageLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            if (uri != null) {
+                tempSelectedImageUri = uri
+                activeDialogCoverPreview?.let { imgView ->
+                    Glide.with(this)
+                        .load(uri)
+                        .centerCrop()
+                        .into(imgView)
+                }
+            }
+        }
+
+    private data class PendingEdit(
+        val position: Int,
+        val newTitle: String,
+        val newArtist: String,
+        val newImageUri: Uri?
+    )
+    private var pendingEditSong: PendingEdit? = null
+
+    private val editMediaLauncher =
+        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                pendingEditSong?.let { edit ->
+                    applySongEditToApp(edit.position, edit.newTitle, edit.newArtist, edit.newImageUri)
+                }
+            } else {
+                Toast.makeText(this, "Edit cancelled", Toast.LENGTH_SHORT).show()
+            }
+            pendingEditSong = null
+        }
 
     private val stateListener = {
         runOnUiThread {
@@ -171,14 +218,11 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
             if (isPlaying) R.drawable.baseline_pause_24 else R.drawable.baseline_play_arrow_24
         )
 
-        val albumArtUri = ContentUris.withAppendedId(
-            Uri.parse("content://media/external/audio/albumart"),
-            song.albumId
-        )
+        val albumArtTarget = song.getAlbumArtTarget(this)
 
         Glide.with(this)
             .asBitmap()
-            .load(albumArtUri)
+            .load(albumArtTarget)
             .centerCrop()
             .placeholder(R.drawable.baseline_music_note_24)
             .into(binding.miniAlbumArt)
@@ -210,8 +254,16 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
     private fun loadSongs() {
         songList = getSongs()
-        adapter = SongAdapter(songList, this)
+        adapter = SongAdapter(songList, this, this)
         binding.recyclerView.adapter = adapter
+    }
+
+    private fun saveSongMetadataToPrefs(songId: Long, title: String, artist: String) {
+        val prefs = getSharedPreferences("custom_song_metadata", Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString("title_$songId", title)
+            .putString("artist_$songId", artist)
+            .apply()
     }
 
     private fun getSongs(): List<Song> {
@@ -219,6 +271,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
+        val prefs = getSharedPreferences("custom_song_metadata", Context.MODE_PRIVATE)
 
         contentResolver.query(uri, null, selection, null, sortOrder)?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
@@ -229,10 +282,20 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
-                val title = cursor.getString(titleColumn)
-                val artist = cursor.getString(artistColumns)
+                var title = cursor.getString(titleColumn)
+                var artist = cursor.getString(artistColumns)
                 val data = cursor.getString(dataColumn)
                 val albumId = cursor.getLong(albumIdColumn)
+
+                val savedTitle = prefs.getString("title_$id", null)
+                val savedArtist = prefs.getString("artist_$id", null)
+
+                if (!savedTitle.isNullOrEmpty()) {
+                    title = savedTitle
+                }
+                if (!savedArtist.isNullOrEmpty()) {
+                    artist = savedArtist
+                }
 
                 songs.add(Song(id, title, artist, data, albumId))
             }
@@ -246,5 +309,166 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
             putExtra("position", position)
         }
         startActivity(intent)
+    }
+
+    override fun onItemLongClick(position: Int): Boolean {
+        showEditSongDialog(position)
+        return true
+    }
+
+    private fun showEditSongDialog(position: Int) {
+        if (position !in songList.indices) return
+        val song = songList[position]
+        tempSelectedImageUri = null
+
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(50, 30, 50, 10)
+        }
+
+        val coverPreview = ImageView(this).apply {
+            val params = LinearLayout.LayoutParams(160, 160).apply {
+                bottomMargin = 20
+            }
+            layoutParams = params
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+        activeDialogCoverPreview = coverPreview
+
+        Glide.with(this)
+            .load(song.getAlbumArtTarget(this))
+            .placeholder(R.drawable.baseline_music_note_24)
+            .into(coverPreview)
+
+        val changeArtButton = Button(this).apply {
+            text = "Change Cover Image"
+            setTextColor(getColor(R.color.white))
+            setBackgroundColor(Color.parseColor("#2A2A2A"))
+            setOnClickListener {
+                pickImageLauncher.launch("image/*")
+            }
+        }
+
+        val inputTitle = EditText(this).apply {
+            hint = "Song Title"
+            setText(song.title)
+            setTextColor(getColor(R.color.white))
+            setHintTextColor(getColor(R.color.light_gray))
+        }
+
+        val inputArtist = EditText(this).apply {
+            hint = "Artist Name"
+            setText(song.artist)
+            setTextColor(getColor(R.color.white))
+            setHintTextColor(getColor(R.color.light_gray))
+        }
+
+        layout.addView(coverPreview)
+        layout.addView(changeArtButton)
+        layout.addView(inputTitle)
+        layout.addView(inputArtist)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Edit Song Info")
+            .setView(layout)
+            .setPositiveButton("Save") { _, _ ->
+                val newTitle = inputTitle.text.toString().trim()
+                val newArtist = inputArtist.text.toString().trim()
+                val imageToSave = tempSelectedImageUri
+                if (newTitle.isNotEmpty()) {
+                    updateSongMetadata(position, newTitle, newArtist, imageToSave)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(getColor(R.color.white))
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(getColor(R.color.white))
+    }
+
+    private fun updateSongMetadata(position: Int, newTitle: String, newArtist: String, newImageUri: Uri?) {
+        if (position !in songList.indices) return
+        val song = songList[position]
+
+        val values = ContentValues().apply {
+            put(MediaStore.Audio.Media.TITLE, newTitle)
+            put(MediaStore.Audio.Media.ARTIST, newArtist)
+        }
+        val songUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
+
+        try {
+            val updatedRows = contentResolver.update(songUri, values, null, null)
+            if (updatedRows > 0 || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                applySongEditToApp(position, newTitle, newArtist, newImageUri)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                pendingEditSong = PendingEdit(position, newTitle, newArtist, newImageUri)
+                val writeRequest = MediaStore.createWriteRequest(contentResolver, listOf(songUri))
+                editMediaLauncher.launch(IntentSenderRequest.Builder(writeRequest.intentSender).build())
+            } else {
+                applySongEditToApp(position, newTitle, newArtist, newImageUri)
+            }
+        } catch (securityException: SecurityException) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val recoverableSecurityException = securityException as? RecoverableSecurityException
+                val intentSender = recoverableSecurityException?.userAction?.actionIntent?.intentSender
+                if (intentSender != null) {
+                    pendingEditSong = PendingEdit(position, newTitle, newArtist, newImageUri)
+                    editMediaLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    pendingEditSong = PendingEdit(position, newTitle, newArtist, newImageUri)
+                    val writeRequest = MediaStore.createWriteRequest(contentResolver, listOf(songUri))
+                    editMediaLauncher.launch(IntentSenderRequest.Builder(writeRequest.intentSender).build())
+                } else {
+                    Toast.makeText(this, "Permission required to edit song", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                Toast.makeText(this, "Failed to edit song", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error updating song: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun saveCustomAlbumArt(songId: Long, albumId: Long, imageUri: Uri) {
+        try {
+            val songFile = File(filesDir, "albumart_$songId.jpg")
+            val albumFile = File(filesDir, "albumart_$albumId.jpg")
+
+            contentResolver.openInputStream(imageUri)?.use { input ->
+                val bytes = input.readBytes()
+                songFile.writeBytes(bytes)
+                albumFile.writeBytes(bytes)
+            }
+            Glide.get(applicationContext).clearMemory()
+            Thread {
+                Glide.get(applicationContext).clearDiskCache()
+            }.start()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Failed to save cover image", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun applySongEditToApp(position: Int, newTitle: String, newArtist: String, newImageUri: Uri?) {
+        val oldSong = songList[position]
+
+        saveSongMetadataToPrefs(oldSong.id, newTitle, newArtist)
+
+        if (newImageUri != null) {
+            saveCustomAlbumArt(oldSong.id, oldSong.albumId, newImageUri)
+        }
+
+        val updatedSong = Song(oldSong.id, newTitle, newArtist, oldSong.data, oldSong.albumId)
+        (songList as? MutableList)?.set(position, updatedSong)
+        adapter.notifyItemChanged(position)
+
+        val srv = audioService
+        if (srv != null) {
+            srv.updateActiveSongMetadata(updatedSong)
+        }
+
+        Toast.makeText(this, "Song updated permanently", Toast.LENGTH_SHORT).show()
     }
 }

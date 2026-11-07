@@ -1,8 +1,6 @@
 package com.example.myapplication.adapter
 
-import android.content.ContentUris
 import android.graphics.Color
-import android.net.Uri
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
@@ -13,7 +11,8 @@ import com.example.myapplication.model.Song
 
 class SongAdapter(
     private val songs: List<Song>,
-    private val listener: OnItemClickListener
+    private val listener: OnItemClickListener,
+    private val longClickListener: OnItemLongClickListener? = null
 ) : RecyclerView.Adapter<SongAdapter.SongViewHolder>() {
 
     private var playingSongId: Long? = null
@@ -29,9 +28,14 @@ class SongAdapter(
         fun onItemClick(position: Int)
     }
 
+    interface OnItemLongClickListener {
+        fun onItemLongClick(position: Int): Boolean
+    }
+
     class SongViewHolder(
         val binding: ItemSongBinding,
-        private val listener: OnItemClickListener
+        private val listener: OnItemClickListener,
+        private val longClickListener: OnItemLongClickListener?
     ) : RecyclerView.ViewHolder(binding.root) {
         init {
             binding.root.setOnClickListener {
@@ -39,6 +43,12 @@ class SongAdapter(
                 if (pos != RecyclerView.NO_POSITION) {
                     listener.onItemClick(pos)
                 }
+            }
+            binding.root.setOnLongClickListener {
+                val pos = adapterPosition
+                if (pos != RecyclerView.NO_POSITION) {
+                    longClickListener?.onItemLongClick(pos) ?: false
+                } else false
             }
         }
     }
@@ -48,7 +58,7 @@ class SongAdapter(
         viewType: Int
     ): SongViewHolder {
         val binding = ItemSongBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return SongViewHolder(binding, listener)
+        return SongViewHolder(binding, listener, longClickListener)
     }
 
     override fun onBindViewHolder(holder: SongViewHolder, position: Int) {
@@ -62,13 +72,10 @@ class SongAdapter(
             holder.binding.root.setBackgroundColor(Color.TRANSPARENT)
         }
 
-        val albumArtUri = ContentUris.withAppendedId(
-            Uri.parse("content://media/external/audio/albumart"),
-            song.albumId
-        )
+        val albumArtTarget = song.getAlbumArtTarget(holder.binding.root.context)
 
         Glide.with(holder.binding.root.context)
-            .load(albumArtUri)
+            .load(albumArtTarget)
             .circleCrop()
             .placeholder(R.drawable.baseline_music_note_24)
             .error(R.drawable.baseline_music_note_24)

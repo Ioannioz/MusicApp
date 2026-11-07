@@ -1,12 +1,10 @@
 package com.example.myapplication.activites
 
 import android.content.ComponentName
-import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.PorterDuff
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -24,7 +22,6 @@ import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
-import java.io.InputStream
 import java.util.Locale
 import kotlin.random.Random
 
@@ -246,34 +243,15 @@ class PlayerActivity : AppCompatActivity() {
         binding.textArtist.text = song.artist ?: ""
         title = song.title
 
-        val albumArtUri = getAlbumArtUri(song.albumId)
+        val albumArtTarget = song.getAlbumArtTarget(this)
 
-        if (hasAlbumArt(albumArtUri)) {
-            Glide.with(this)
-                .asBitmap()
-                .load(albumArtUri)
-                .centerCrop()
-                .placeholder(R.drawable.baseline_music_note_24)
-                .into(binding.imageAlbumArtPlayer)
-        } else {
-            binding.imageAlbumArtPlayer.setImageResource(R.drawable.baseline_music_note_24)
-        }
-    }
-
-    private fun hasAlbumArt(albumArtUri: Uri): Boolean {
-        return try {
-            val inputStream: InputStream? = contentResolver.openInputStream(albumArtUri)
-            inputStream?.use { true } ?: false
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    private fun getAlbumArtUri(albumId: Long): Uri {
-        return ContentUris.withAppendedId(
-            Uri.parse("content://media/external/audio/albumart"),
-            albumId
-        )
+        Glide.with(this)
+            .asBitmap()
+            .load(albumArtTarget)
+            .centerCrop()
+            .placeholder(R.drawable.baseline_music_note_24)
+            .error(R.drawable.baseline_music_note_24)
+            .into(binding.imageAlbumArtPlayer)
     }
 
     private fun createWaveform(): IntArray {
