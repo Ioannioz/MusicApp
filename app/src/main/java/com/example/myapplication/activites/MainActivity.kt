@@ -62,6 +62,23 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             }
         }
 
+    private val webCoverLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val uriString = result.data?.getStringExtra("web_image_uri")
+                if (!uriString.isNullOrEmpty()) {
+                    val uri = Uri.parse(uriString)
+                    tempSelectedImageUri = uri
+                    activeDialogCoverPreview?.let { imgView ->
+                        Glide.with(this)
+                            .load(uri)
+                            .centerCrop()
+                            .into(imgView)
+                    }
+                }
+            }
+        }
+
     private data class PendingEdit(
         val position: Int,
         val newTitle: String,
@@ -341,15 +358,6 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             .placeholder(R.drawable.baseline_music_note_24)
             .into(coverPreview)
 
-        val changeArtButton = Button(this).apply {
-            text = "Change Cover Image"
-            setTextColor(getColor(R.color.white))
-            setBackgroundColor(Color.parseColor("#2A2A2A"))
-            setOnClickListener {
-                pickImageLauncher.launch("image/*")
-            }
-        }
-
         val inputTitle = EditText(this).apply {
             hint = "Song Title"
             setText(song.title)
@@ -362,6 +370,32 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             setText(song.artist)
             setTextColor(getColor(R.color.white))
             setHintTextColor(getColor(R.color.light_gray))
+        }
+
+        val changeArtButton = Button(this).apply {
+            text = "Change Cover Image"
+            setTextColor(getColor(R.color.white))
+            setBackgroundColor(Color.parseColor("#2A2A2A"))
+            setOnClickListener {
+                val options = arrayOf("Search Device Files", "Search Web")
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Choose Image Source")
+                    .setItems(options) { _, which ->
+                        when (which) {
+                            0 -> pickImageLauncher.launch("image/*")
+                            1 -> {
+                                val currentTitle = inputTitle.text.toString().trim()
+                                val currentArtist = inputArtist.text.toString().trim()
+                                val query = "$currentTitle $currentArtist album cover".trim()
+                                val webIntent = Intent(this@MainActivity, WebCoverPickerActivity::class.java).apply {
+                                    putExtra("search_query", query)
+                                }
+                                webCoverLauncher.launch(webIntent)
+                            }
+                        }
+                    }
+                    .show()
+            }
         }
 
         layout.addView(coverPreview)
@@ -434,13 +468,15 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
 
     private fun saveCustomAlbumArt(songId: Long, albumId: Long, imageUri: Uri) {
         try {
-            val songFile = File(filesDir, "albumart_$songId.jpg")
-            val albumFile = File(filesDir, "albumart_$albumId.jpg")
+            val oldSharedFile = File(filesDir, "albumart_$albumId.jpg")
+            if (oldSharedFile.exists()) {
+                oldSharedFile.delete()
+            }
 
+            val songFile = File(filesDir, "albumart_$songId.jpg")
             contentResolver.openInputStream(imageUri)?.use { input ->
                 val bytes = input.readBytes()
                 songFile.writeBytes(bytes)
-                albumFile.writeBytes(bytes)
             }
             Glide.get(applicationContext).clearMemory()
             Thread {

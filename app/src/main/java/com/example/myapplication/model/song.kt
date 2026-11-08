@@ -16,11 +16,10 @@ data class Song(
 
     fun getAlbumArtTarget(context: Context): Any {
         val customSongFile = File(context.filesDir, "albumart_$id.jpg")
-        val customAlbumFile = File(context.filesDir, "albumart_$albumId.jpg")
-        return when {
-            customSongFile.exists() -> customSongFile
-            customAlbumFile.exists() -> customAlbumFile
-            else -> ContentUris.withAppendedId(
+        return if (customSongFile.exists()) {
+            customSongFile
+        } else {
+            ContentUris.withAppendedId(
                 Uri.parse("content://media/external/audio/albumart"),
                 albumId
             )

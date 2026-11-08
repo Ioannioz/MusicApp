@@ -76,7 +76,7 @@ class SongAdapter(
 
         Glide.with(holder.binding.root.context)
             .load(albumArtTarget)
-            .circleCrop()
+            .centerCrop()
             .placeholder(R.drawable.baseline_music_note_24)
             .error(R.drawable.baseline_music_note_24)
             .into(holder.binding.imageAlbumArt)
