@@ -30,6 +30,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.myapplication.R
 import com.example.myapplication.adapter.SongAdapter
 import com.example.myapplication.databinding.ActivityMainBinding
@@ -56,6 +57,8 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
                 activeDialogCoverPreview?.let { imgView ->
                     Glide.with(this)
                         .load(uri)
+                        .skipMemoryCache(true)
+                        .diskCacheStrategy(DiskCacheStrategy.NONE)
                         .centerCrop()
                         .into(imgView)
                 }
@@ -72,6 +75,8 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
                     activeDialogCoverPreview?.let { imgView ->
                         Glide.with(this)
                             .load(uri)
+                            .skipMemoryCache(true)
+                            .diskCacheStrategy(DiskCacheStrategy.NONE)
                             .centerCrop()
                             .into(imgView)
                     }
