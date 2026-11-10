@@ -113,6 +113,10 @@ class SongAdapter(
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         val song = songs[position]
+        val context = holder.itemView.context
+        val theme = com.example.myapplication.model.ThemeManager.getSelectedTheme(context)
+        val activeBgColor = Color.parseColor(theme.cardColorHex)
+        val activeTitleColor = Color.parseColor(theme.accentColorHex)
 
         if (holder is ListSongViewHolder) {
             holder.binding.textTitle.text = song.title
@@ -123,9 +127,11 @@ class SongAdapter(
             holder.binding.textArtist.text = "$artistText$durationText"
 
             if (playingSongId != null && song.id == playingSongId) {
-                holder.binding.root.setBackgroundColor(Color.parseColor("#121212"))
+                holder.binding.root.setBackgroundColor(activeBgColor)
+                holder.binding.textTitle.setTextColor(activeTitleColor)
             } else {
                 holder.binding.root.setBackgroundColor(Color.TRANSPARENT)
+                holder.binding.textTitle.setTextColor(Color.WHITE)
             }
 
             val albumArtTarget = song.getAlbumArtTarget(holder.binding.root.context)
@@ -141,9 +147,11 @@ class SongAdapter(
             holder.binding.textArtist.text = song.artist ?: "Unknown Artist"
 
             if (playingSongId != null && song.id == playingSongId) {
-                holder.binding.root.setBackgroundColor(Color.parseColor("#121212"))
+                holder.binding.root.setBackgroundColor(activeBgColor)
+                holder.binding.textTitle.setTextColor(activeTitleColor)
             } else {
                 holder.binding.root.setBackgroundColor(Color.TRANSPARENT)
+                holder.binding.textTitle.setTextColor(Color.WHITE)
             }
 
             val albumArtTarget = song.getAlbumArtTarget(holder.binding.root.context)

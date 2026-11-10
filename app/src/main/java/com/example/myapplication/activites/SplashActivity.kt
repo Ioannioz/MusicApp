@@ -44,7 +44,22 @@ class SplashActivity : AppCompatActivity() {
         binding = ActivitySplashBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        applySplashTheme()
         checkPermissionsAndLoad()
+    }
+
+    private fun applySplashTheme() {
+        val theme = com.example.myapplication.model.ThemeManager.getSelectedTheme(this)
+        val bgColor = android.graphics.Color.parseColor(theme.bgColorHex)
+        val accentColor = android.graphics.Color.parseColor(theme.accentColorHex)
+
+        binding.PlayerRoot.setBackgroundColor(bgColor)
+        binding.progressBar.indeterminateTintList = android.content.res.ColorStateList.valueOf(accentColor)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.statusBarColor = bgColor
+            window.navigationBarColor = bgColor
+        }
     }
 
     private fun checkPermissionsAndLoad() {

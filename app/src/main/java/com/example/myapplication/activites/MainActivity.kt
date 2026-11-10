@@ -30,7 +30,9 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.cardview.widget.CardView
 import androidx.constraintlayout.widget.ConstraintLayout
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -49,7 +51,6 @@ import com.example.myapplication.model.Playlist
 import com.example.myapplication.model.PlaylistManager
 import com.example.myapplication.model.Song
 import com.example.myapplication.service.AudioService
-import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.exoplayer2.Player
 import org.json.JSONArray
 import java.io.File
@@ -211,23 +212,24 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
     }
 
     private fun selectTab(position: Int) {
-        val white = getColor(R.color.white)
+        val theme = com.example.myapplication.model.ThemeManager.getSelectedTheme(this)
+        val activeColor = android.graphics.Color.parseColor(theme.accentColorHex)
         val lightGray = getColor(R.color.light_gray)
 
-        binding.iconHome.setColorFilter(if (position == 0) white else lightGray)
-        binding.textHome.setTextColor(if (position == 0) white else lightGray)
+        binding.iconHome.setColorFilter(if (position == 0) activeColor else lightGray)
+        binding.textHome.setTextColor(if (position == 0) activeColor else lightGray)
 
-        binding.iconPlaylist.setColorFilter(if (position == 1) white else lightGray)
-        binding.textPlaylist.setTextColor(if (position == 1) white else lightGray)
+        binding.iconPlaylist.setColorFilter(if (position == 1) activeColor else lightGray)
+        binding.textPlaylist.setTextColor(if (position == 1) activeColor else lightGray)
 
-        binding.iconEqualizer.setColorFilter(if (position == 2) white else lightGray)
-        binding.textEqualizer.setTextColor(if (position == 2) white else lightGray)
+        binding.iconEqualizer.setColorFilter(if (position == 2) activeColor else lightGray)
+        binding.textEqualizer.setTextColor(if (position == 2) activeColor else lightGray)
 
-        binding.iconStats.setColorFilter(if (position == 3) white else lightGray)
-        binding.textStats.setTextColor(if (position == 3) white else lightGray)
+        binding.iconStats.setColorFilter(if (position == 3) activeColor else lightGray)
+        binding.textStats.setTextColor(if (position == 3) activeColor else lightGray)
 
-        binding.iconThemes.setColorFilter(if (position == 4) white else lightGray)
-        binding.textThemes.setTextColor(if (position == 4) white else lightGray)
+        binding.iconThemes.setColorFilter(if (position == 4) activeColor else lightGray)
+        binding.textThemes.setTextColor(if (position == 4) activeColor else lightGray)
     }
 
     private fun setupTabHeaderNavigation() {
@@ -277,6 +279,8 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
             window.statusBarColor = bgColor
             window.navigationBarColor = bgColor
         }
+
+        selectTab(binding.viewPagerMain.currentItem)
     }
 
     override fun onStart() {
@@ -544,7 +548,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
     fun getSongList(): List<Song> = songList
 
-    private fun showQueueNotification(message: String) {
+    fun showQueueNotification(message: String) {
         ToastHelper.showToast(this, message)
     }
 
@@ -665,8 +669,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         }
 
         dialog.setContentView(sheetView)
-        val bottomSheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
-        bottomSheet?.setBackgroundResource(android.R.color.transparent)
+        com.example.myapplication.util.DialogThemeHelper.styleBottomSheet(dialog, this)
         dialog.show()
     }
 
@@ -712,7 +715,10 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
             }
 
             dialog.setView(view)
-            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+            com.example.myapplication.util.DialogThemeHelper.styleDialogView(view, this)
+            com.example.myapplication.util.DialogThemeHelper.styleEditText(input, this)
+            com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnConfirm, this)
+            com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, this)
             dialog.show()
         } else {
             val dialog = AlertDialog.Builder(this).create()
@@ -819,24 +825,48 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         inputArtist.setText(song.artist)
 
         btnChangeArt.setOnClickListener {
-            val options = arrayOf("Search Device Files", "Search Web")
-            AlertDialog.Builder(this)
-                .setTitle("Choose Image Source")
-                .setItems(options) { _, which ->
-                    when (which) {
-                        0 -> pickImageLauncher.launch("image/*")
-                        1 -> {
-                            val currentTitle = inputTitle.text.toString().trim()
-                            val currentArtist = inputArtist.text.toString().trim()
-                            val query = "$currentTitle $currentArtist album cover".trim()
-                            val webIntent = Intent(this, WebCoverPickerActivity::class.java).apply {
-                                putExtra("search_query", query)
-                            }
-                            webCoverLauncher.launch(webIntent)
-                        }
-                    }
+            val sourceDialog = BottomSheetDialog(this, com.google.android.material.R.style.Theme_Design_BottomSheetDialog)
+            val sourceView = layoutInflater.inflate(R.layout.dialog_choose_image_source, null)
+
+            val theme = com.example.myapplication.model.ThemeManager.getSelectedTheme(this)
+            val cardColor = android.graphics.Color.parseColor(theme.cardColorHex)
+            val accentColor = android.graphics.Color.parseColor(theme.accentColorHex)
+
+            val cardDevice = sourceView.findViewById<CardView>(R.id.cardOptionDevice)
+            val cardWeb = sourceView.findViewById<CardView>(R.id.cardOptionWeb)
+            val iconDevice = sourceView.findViewById<ImageView>(R.id.iconOptionDevice)
+            val iconWeb = sourceView.findViewById<ImageView>(R.id.iconOptionWeb)
+            val btnCancelSource = sourceView.findViewById<Button>(R.id.btnCancelSource)
+
+            cardDevice?.setCardBackgroundColor(cardColor)
+            cardWeb?.setCardBackgroundColor(cardColor)
+            iconDevice?.setColorFilter(accentColor)
+            iconWeb?.setColorFilter(accentColor)
+
+            if (btnCancelSource != null) {
+                com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancelSource, this)
+                btnCancelSource.setOnClickListener { sourceDialog.dismiss() }
+            }
+
+            cardDevice?.setOnClickListener {
+                sourceDialog.dismiss()
+                pickImageLauncher.launch("image/*")
+            }
+
+            cardWeb?.setOnClickListener {
+                sourceDialog.dismiss()
+                val currentTitle = inputTitle.text.toString().trim()
+                val currentArtist = inputArtist.text.toString().trim()
+                val query = "$currentTitle $currentArtist album cover".trim()
+                val webIntent = Intent(this, WebCoverPickerActivity::class.java).apply {
+                    putExtra("search_query", query)
                 }
-                .show()
+                webCoverLauncher.launch(webIntent)
+            }
+
+            sourceDialog.setContentView(sourceView)
+            com.example.myapplication.util.DialogThemeHelper.styleBottomSheet(sourceDialog, this)
+            sourceDialog.show()
         }
 
         btnCancel.setOnClickListener { dialog.dismiss() }
@@ -854,7 +884,12 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         }
 
         dialog.setView(view)
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        com.example.myapplication.util.DialogThemeHelper.styleDialogView(view, this)
+        com.example.myapplication.util.DialogThemeHelper.styleEditText(inputTitle, this)
+        com.example.myapplication.util.DialogThemeHelper.styleEditText(inputArtist, this)
+        com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnChangeArt, this)
+        com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, this)
+        com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnSave, this)
         dialog.show()
     }
 

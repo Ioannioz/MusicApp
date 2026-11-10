@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.PorterDuff
+import android.os.Binder
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -122,7 +124,7 @@ class PlayerActivity : AppCompatActivity() {
             val isPlayingOrPrepared = srv.player?.let { it.playbackState != Player.STATE_IDLE } == true
             val targetSong = if (currentIndex in songList.indices) songList[currentIndex] else null
 
-            val isSameSongPlaying = isPlayingOrPrepared && currentSong != null && targetSong != null && currentSong.id == targetSong.id && srv.songList.size == songList.size && srv.songList.map { it.id } == songList.map { it.id }
+            val isSameSongPlaying = isPlayingOrPrepared && currentSong != null && targetSong != null && currentSong.id == targetSong.id
 
             if (!isSameSongPlaying) {
                 srv.playNewList(songList, currentIndex)
@@ -229,6 +231,9 @@ class PlayerActivity : AppCompatActivity() {
         val serviceIntent = Intent(this, AudioService::class.java)
         startService(serviceIntent)
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+
+        com.example.myapplication.model.ThemeManager.addThemeChangeListener(themeChangeListener)
+        applyAppTheme(com.example.myapplication.model.ThemeManager.getSelectedTheme(this))
     }
 
     private fun setupEmbeddedQueueSheet() {
@@ -618,21 +623,26 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun updateRepeatShuffleIcons() {
         val srv = audioService ?: return
+        val theme = com.example.myapplication.model.ThemeManager.getSelectedTheme(this)
+        val accentColor = android.graphics.Color.parseColor(theme.accentColorHex)
+        val isLightAccent = theme.accentColorHex.equals("#FFFFFF", ignoreCase = true) || theme.accentColorHex.equals("#DBD8E3", ignoreCase = true)
+        val activeIconTint = if (isLightAccent) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+
         if (srv.isRepeat) {
-            binding.buttonRepeat.setColorFilter(
-                getColor(R.color.purple_500),
-                PorterDuff.Mode.SRC_IN
-            )
+            binding.buttonRepeat.setBackgroundResource(R.drawable.circle_white_bg)
+            binding.buttonRepeat.backgroundTintList = android.content.res.ColorStateList.valueOf(accentColor)
+            binding.buttonRepeat.setColorFilter(activeIconTint, PorterDuff.Mode.SRC_IN)
         } else {
+            binding.buttonRepeat.background = null
             binding.buttonRepeat.clearColorFilter()
         }
 
         if (srv.isShuffle) {
-            binding.ButtonSuffle.setColorFilter(
-                getColor(R.color.purple_500),
-                PorterDuff.Mode.SRC_IN
-            )
+            binding.ButtonSuffle.setBackgroundResource(R.drawable.circle_white_bg)
+            binding.ButtonSuffle.backgroundTintList = android.content.res.ColorStateList.valueOf(accentColor)
+            binding.ButtonSuffle.setColorFilter(activeIconTint, PorterDuff.Mode.SRC_IN)
         } else {
+            binding.ButtonSuffle.background = null
             binding.ButtonSuffle.clearColorFilter()
         }
     }
@@ -665,10 +675,10 @@ class PlayerActivity : AppCompatActivity() {
         val isLiked = PlaylistManager.isSongLiked(this, song.id)
         if (isLiked) {
             binding.favBtn.setImageResource(R.drawable.baseline_favorite_24)
-            binding.favBtn.setColorFilter(getColor(R.color.purple_500), PorterDuff.Mode.SRC_IN)
+            binding.favBtn.setColorFilter(android.graphics.Color.WHITE, PorterDuff.Mode.SRC_IN)
         } else {
             binding.favBtn.setImageResource(R.drawable.baseline_favorite_border_24)
-            binding.favBtn.setColorFilter(getColor(R.color.white), PorterDuff.Mode.SRC_IN)
+            binding.favBtn.setColorFilter(android.graphics.Color.WHITE, PorterDuff.Mode.SRC_IN)
         }
     }
 
@@ -712,8 +722,32 @@ class PlayerActivity : AppCompatActivity() {
         updatePlayerMiniPlayerUI()
     }
 
+    private val themeChangeListener: (com.example.myapplication.model.AppTheme) -> Unit = { theme ->
+        runOnUiThread {
+            applyAppTheme(theme)
+        }
+    }
+
+    private fun applyAppTheme(theme: com.example.myapplication.model.AppTheme) {
+        val bgColor = android.graphics.Color.parseColor(theme.bgColorHex)
+        val cardColor = android.graphics.Color.parseColor(theme.cardColorHex)
+        val accentColor = android.graphics.Color.parseColor(theme.accentColorHex)
+
+        binding.PlayerRoot.setBackgroundColor(bgColor)
+        binding.miniPlayerLayoutPlayer.setBackgroundColor(cardColor)
+        binding.embeddedQueueSheet.setBackgroundColor(cardColor)
+        binding.waveformSeekBar.setWaveProgressColor(accentColor)
+        binding.buttonPlay.setColorFilter(accentColor)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.statusBarColor = bgColor
+            window.navigationBarColor = bgColor
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        com.example.myapplication.model.ThemeManager.removeThemeChangeListener(themeChangeListener)
         handle.removeCallbacks(updateRunnable)
         if (isBound) {
             audioService?.removeStateChangeListener(stateListener)
