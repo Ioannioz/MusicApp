@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">My Application</string>
+    <string name="app_name">Tolom Player</string>
     <string name="explorer_artist">Explorer Artist</string>
     <string name="song_title">Song Title</string>
     <string name="artist">Artist</string>

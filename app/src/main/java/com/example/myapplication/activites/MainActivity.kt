@@ -9,46 +9,90 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.MediaStore
-import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.SeekBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.myapplication.R
+import com.example.myapplication.adapter.MainPagerAdapter
+import com.example.myapplication.adapter.PlaylistAdapter
 import com.example.myapplication.adapter.SongAdapter
 import com.example.myapplication.databinding.ActivityMainBinding
+import com.example.myapplication.model.Playlist
+import com.example.myapplication.model.PlaylistManager
 import com.example.myapplication.model.Song
 import com.example.myapplication.service.AudioService
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.exoplayer2.Player
+import org.json.JSONArray
 import java.io.File
+import java.util.Collections
+import java.util.Locale
 
-class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongAdapter.OnItemLongClickListener {
+class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
     private lateinit var binding: ActivityMainBinding
-    private lateinit var adapter: SongAdapter
+    private lateinit var pagerAdapter: MainPagerAdapter
     private var songList: List<Song> = mutableListOf()
 
     private var audioService: AudioService? = null
     private var isBound = false
+    private var activeQueueToast: Toast? = null
+    private val handle = Handler(Looper.getMainLooper())
+    private var isUserScrubbingMini = false
+
+    fun getAudioService(): AudioService? = audioService
 
     private var tempSelectedImageUri: Uri? = null
     private var activeDialogCoverPreview: ImageView? = null
+
+    private val updateProgressRunnable = object : Runnable {
+        override fun run() {
+            val srv = audioService
+            val player = srv?.player
+            if (srv != null && player != null) {
+                val currentPosition = player.currentPosition
+                val duration = player.duration
+                if (duration > 0 && !isUserScrubbingMini) {
+                    val progressRatio = currentPosition.toFloat() / duration.toFloat()
+                    binding.miniSeekBar.progress = (progressRatio * 1000).toInt()
+
+                    val seconds = (currentPosition / 1000).toInt()
+                    val minutes = seconds / 60
+                    val secs = seconds % 60
+                    binding.miniTextElapsed.text = String.format(Locale.getDefault(), "%d:%02d", minutes, secs)
+                }
+                if (player.isPlaying) {
+                    handle.postDelayed(this, 100)
+                }
+            }
+        }
+    }
 
     private val pickImageLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
@@ -149,9 +193,41 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
         setContentView(binding.root)
         enableEdgeToEdge()
 
-        binding.recyclerView.layoutManager = LinearLayoutManager(this)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.PlayerRoot) { _, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            binding.miniPlayerLayout.updateLayoutParams<ConstraintLayout.LayoutParams> {
+                bottomMargin = systemBars.bottom
+            }
+            insets
+        }
+
         checkPermissionAndLoadSong()
         setupMiniPlayerControls()
+        setupTabHeaderNavigation()
+    }
+
+    private fun setupTabHeaderNavigation() {
+        binding.viewPagerMain.isUserInputEnabled = true
+
+        binding.tabDeviceFiles.setOnClickListener {
+            binding.viewPagerMain.currentItem = 0
+        }
+
+        binding.tabPlaylist.setOnClickListener {
+            binding.viewPagerMain.currentItem = 1
+        }
+
+        binding.viewPagerMain.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                if (position == 0) {
+                    binding.tabDeviceFiles.setTextColor(getColor(R.color.white))
+                    binding.tabPlaylist.setTextColor(getColor(R.color.light_gray))
+                } else {
+                    binding.tabDeviceFiles.setTextColor(getColor(R.color.light_gray))
+                    binding.tabPlaylist.setTextColor(getColor(R.color.white))
+                }
+            }
+        })
     }
 
     override fun onStart() {
@@ -168,8 +244,16 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        activeQueueToast?.cancel()
+        handle.removeCallbacks(updateProgressRunnable)
+    }
+
     override fun onStop() {
         super.onStop()
+        activeQueueToast?.cancel()
+        handle.removeCallbacks(updateProgressRunnable)
         if (isBound) {
             audioService?.removeStateChangeListener(stateListener)
             unbindService(serviceConnection)
@@ -203,29 +287,63 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             audioService?.playNext()
             updateMiniPlayerUI()
         }
+
+        binding.miniSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val srv = audioService ?: return
+                    val p = srv.player ?: return
+                    val duration = p.duration
+                    if (duration > 0) {
+                        val seekMs = (progress.toFloat() / 1000f * duration).toLong()
+                        val seconds = (seekMs / 1000).toInt()
+                        val minutes = seconds / 60
+                        val secs = seconds % 60
+                        binding.miniTextElapsed.text = String.format(Locale.getDefault(), "%d:%02d", minutes, secs)
+                    }
+                }
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                isUserScrubbingMini = true
+            }
+
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val srv = audioService ?: return
+                val p = srv.player ?: return
+                val duration = p.duration
+                if (duration > 0 && seekBar != null) {
+                    val targetMs = (seekBar.progress.toFloat() / 1000f * duration).toLong()
+                    p.seekTo(targetMs)
+                }
+                isUserScrubbingMini = false
+            }
+        })
     }
 
-    private fun updateMiniPlayerUI() {
+    fun updateMiniPlayerUI() {
         val srv = audioService ?: run {
             binding.miniPlayerLayout.visibility = View.GONE
-            if (::adapter.isInitialized) {
-                adapter.setPlayingSongId(null)
+            if (::pagerAdapter.isInitialized && pagerAdapter.songsFragment.songAdapter != null) {
+                pagerAdapter.songsFragment.songAdapter?.setPlayingSongId(null)
             }
+            handle.removeCallbacks(updateProgressRunnable)
             return
         }
 
         val song = srv.getCurrentSong()
         if (song == null) {
             binding.miniPlayerLayout.visibility = View.GONE
-            if (::adapter.isInitialized) {
-                adapter.setPlayingSongId(null)
+            if (::pagerAdapter.isInitialized && pagerAdapter.songsFragment.songAdapter != null) {
+                pagerAdapter.songsFragment.songAdapter?.setPlayingSongId(null)
             }
+            handle.removeCallbacks(updateProgressRunnable)
             return
         }
 
         binding.miniPlayerLayout.visibility = View.VISIBLE
-        if (::adapter.isInitialized) {
-            adapter.setPlayingSongId(song.id)
+        if (::pagerAdapter.isInitialized && pagerAdapter.songsFragment.songAdapter != null) {
+            pagerAdapter.songsFragment.songAdapter?.setPlayingSongId(song.id)
         }
 
         val newTitle = song.title ?: ""
@@ -248,6 +366,9 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             .centerCrop()
             .placeholder(R.drawable.baseline_music_note_24)
             .into(binding.miniAlbumArt)
+
+        handle.removeCallbacks(updateProgressRunnable)
+        handle.post(updateProgressRunnable)
     }
 
     private fun checkPermissionAndLoadSong() {
@@ -276,8 +397,8 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
 
     private fun loadSongs() {
         songList = getSongs()
-        adapter = SongAdapter(songList, this, this)
-        binding.recyclerView.adapter = adapter
+        pagerAdapter = MainPagerAdapter(this)
+        binding.viewPagerMain.adapter = pagerAdapter
     }
 
     private fun saveSongMetadataToPrefs(songId: Long, title: String, artist: String) {
@@ -288,12 +409,20 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             .apply()
     }
 
+    private fun saveSongOrderToPrefs(songs: List<Song>) {
+        val prefs = getSharedPreferences("custom_song_order", Context.MODE_PRIVATE)
+        val jsonArray = JSONArray()
+        songs.forEach { jsonArray.put(it.id) }
+        prefs.edit().putString("saved_song_id_order", jsonArray.toString()).apply()
+    }
+
     private fun getSongs(): List<Song> {
-        val songs = mutableListOf<Song>()
+        val rawSongsMap = mutableMapOf<Long, Song>()
+        val rawSongsList = mutableListOf<Song>()
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
-        val prefs = getSharedPreferences("custom_song_metadata", Context.MODE_PRIVATE)
+        val prefsMetadata = getSharedPreferences("custom_song_metadata", Context.MODE_PRIVATE)
 
         contentResolver.query(uri, null, selection, null, sortOrder)?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
@@ -301,6 +430,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             val artistColumns = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
             val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
             val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+            val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
@@ -308,9 +438,10 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
                 var artist = cursor.getString(artistColumns)
                 val data = cursor.getString(dataColumn)
                 val albumId = cursor.getLong(albumIdColumn)
+                val duration = cursor.getLong(durationColumn)
 
-                val savedTitle = prefs.getString("title_$id", null)
-                val savedArtist = prefs.getString("artist_$id", null)
+                val savedTitle = prefsMetadata.getString("title_$id", null)
+                val savedArtist = prefsMetadata.getString("artist_$id", null)
 
                 if (!savedTitle.isNullOrEmpty()) {
                     title = savedTitle
@@ -319,10 +450,97 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
                     artist = savedArtist
                 }
 
-                songs.add(Song(id, title, artist, data, albumId))
+                val song = Song(id, title, artist, data, albumId, duration)
+                rawSongsMap[id] = song
+                rawSongsList.add(song)
             }
         }
-        return songs
+
+        val prefsOrder = getSharedPreferences("custom_song_order", Context.MODE_PRIVATE)
+        val savedOrderJson = prefsOrder.getString("saved_song_id_order", null)
+
+        if (!savedOrderJson.isNullOrEmpty()) {
+            try {
+                val orderedSongs = mutableListOf<Song>()
+                val jsonArray = JSONArray(savedOrderJson)
+                for (i in 0 until jsonArray.length()) {
+                    val songId = jsonArray.getLong(i)
+                    val song = rawSongsMap.remove(songId)
+                    if (song != null) {
+                        orderedSongs.add(song)
+                    }
+                }
+                orderedSongs.addAll(rawSongsMap.values)
+                return orderedSongs
+            } catch (e: Exception) {
+                // Ignore parse error
+            }
+        }
+
+        return rawSongsList
+    }
+
+    fun getSongList(): List<Song> = songList
+
+    private fun showQueueNotification(message: String) {
+        activeQueueToast?.cancel()
+        activeQueueToast = Toast.makeText(this, message, Toast.LENGTH_SHORT)
+        activeQueueToast?.show()
+    }
+
+    fun addSongToQueueByPosition(position: Int) {
+        if (position !in songList.indices) return
+        val song = songList[position]
+        val srv = audioService
+        if (srv != null) {
+            srv.addToQueueEnd(song)
+            showQueueNotification("Added \"${song.title ?: "Song"}\" to queue")
+        }
+    }
+
+    fun onSongReordered(fromPos: Int, toPos: Int) {
+        if (fromPos in songList.indices && toPos in songList.indices) {
+            Collections.swap(songList, fromPos, toPos)
+            saveSongOrderToPrefs(songList)
+            val srv = audioService
+            if (srv != null) {
+                srv.songList = songList
+                if (!srv.isShuffle) {
+                    srv.shuffledList = songList.toMutableList()
+                }
+            }
+        }
+    }
+
+    fun sortSongsByName() {
+        val sorted = songList.sortedWith(compareBy<Song, String>(String.CASE_INSENSITIVE_ORDER) { song -> song.title ?: "" })
+        songList = sorted.toMutableList()
+        saveSongOrderToPrefs(songList)
+        getSharedPreferences("custom_song_order", Context.MODE_PRIVATE).edit().putString("current_sort_mode", "name").apply()
+        val srv = audioService
+        if (srv != null) {
+            srv.songList = songList
+            if (!srv.isShuffle) {
+                srv.shuffledList = songList.toMutableList()
+            }
+        }
+    }
+
+    fun sortSongsByArtist() {
+        val sorted = songList.sortedWith(
+            compareBy<Song, String>(String.CASE_INSENSITIVE_ORDER) { song -> song.artist ?: "" }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { song -> song.title ?: "" }
+        )
+        songList = sorted.toMutableList()
+        saveSongOrderToPrefs(songList)
+        getSharedPreferences("custom_song_order", Context.MODE_PRIVATE).edit().putString("current_sort_mode", "artist").apply()
+        val srv = audioService
+        if (srv != null) {
+            srv.songList = songList
+            if (!srv.isShuffle) {
+                srv.shuffledList = songList.toMutableList()
+            }
+        }
     }
 
     override fun onItemClick(position: Int) {
@@ -333,29 +551,203 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
         startActivity(intent)
     }
 
-    override fun onItemLongClick(position: Int): Boolean {
-        showEditSongDialog(position)
-        return true
+    fun showSongOptionsMenu(position: Int, anchorView: View) {
+        if (position !in songList.indices) return
+        val song = songList[position]
+
+        val dialog = BottomSheetDialog(this, com.google.android.material.R.style.Theme_Design_BottomSheetDialog)
+        val sheetView = layoutInflater.inflate(R.layout.dialog_song_options_bottom_sheet, null)
+
+        val sheetAlbumArt = sheetView.findViewById<ImageView>(R.id.sheetAlbumArt)
+        val sheetTitle = sheetView.findViewById<TextView>(R.id.sheetSongTitle)
+        val sheetArtist = sheetView.findViewById<TextView>(R.id.sheetSongArtist)
+
+        val optionPlayNext = sheetView.findViewById<LinearLayout>(R.id.optionPlayNext)
+        val optionAddToQueue = sheetView.findViewById<LinearLayout>(R.id.optionAddToQueue)
+        val optionAddToPlaylist = sheetView.findViewById<LinearLayout>(R.id.optionAddToPlaylist)
+        val optionEditInfo = sheetView.findViewById<LinearLayout>(R.id.optionEditInfo)
+
+        sheetTitle.text = song.title ?: "Unknown Song"
+        sheetArtist.text = song.artist ?: "Unknown Artist"
+
+        Glide.with(this)
+            .load(song.getAlbumArtTarget(this))
+            .centerCrop()
+            .placeholder(R.drawable.baseline_music_note_24)
+            .into(sheetAlbumArt)
+
+        optionPlayNext.setOnClickListener {
+            dialog.dismiss()
+            val srv = audioService
+            if (srv != null) {
+                srv.playNextSongInQueue(song)
+                showQueueNotification("Will play next")
+            }
+        }
+
+        optionAddToQueue.setOnClickListener {
+            dialog.dismiss()
+            val srv = audioService
+            if (srv != null) {
+                srv.addToQueueEnd(song)
+                showQueueNotification("Added \"${song.title ?: "Song"}\" to queue")
+            }
+        }
+
+        optionAddToPlaylist.setOnClickListener {
+            dialog.dismiss()
+            showAddToPlaylistDialog(song)
+        }
+
+        optionEditInfo.setOnClickListener {
+            dialog.dismiss()
+            showEditSongDialog(position)
+        }
+
+        dialog.setContentView(sheetView)
+        val bottomSheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+        bottomSheet?.setBackgroundResource(android.R.color.transparent)
+        dialog.show()
     }
 
-    private fun showEditSongDialog(position: Int) {
+    private fun showAddToPlaylistDialog(song: Song) {
+        val playlists = PlaylistManager.getPlaylists(this)
+
+        if (playlists.isEmpty()) {
+            val dialog = AlertDialog.Builder(this).create()
+            val view = layoutInflater.inflate(R.layout.dialog_input_text, null)
+
+            val titleText = view.findViewById<TextView>(R.id.dialogInputTitle)
+            val subMsgText = view.findViewById<TextView>(R.id.dialogInputSubMessage)
+            val input = view.findViewById<EditText>(R.id.dialogInputField)
+            val btnCancel = view.findViewById<Button>(R.id.btnInputCancel)
+            val btnConfirm = view.findViewById<Button>(R.id.btnInputConfirm)
+
+            titleText.text = "No Playlists Found"
+            subMsgText.visibility = View.VISIBLE
+            subMsgText.text = "Create a new playlist to add this song:"
+            input.hint = "Playlist Name"
+            btnConfirm.text = "Create & Add"
+
+            btnCancel.setOnClickListener { dialog.dismiss() }
+
+            btnConfirm.setOnClickListener {
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty()) {
+                    dialog.dismiss()
+                    val newPlaylist = Playlist(
+                        id = System.currentTimeMillis(),
+                        name = name,
+                        songIds = mutableListOf(song.id)
+                    )
+                    playlists.add(newPlaylist)
+                    PlaylistManager.savePlaylists(this, playlists)
+                    if (::pagerAdapter.isInitialized) {
+                        pagerAdapter.playlistsFragment.refreshPlaylists()
+                    }
+                    Toast.makeText(this, "Created \"$name\" and added song", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            dialog.setView(view)
+            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+            dialog.show()
+        } else {
+            val dialog = AlertDialog.Builder(this).create()
+            val view = layoutInflater.inflate(R.layout.dialog_select_playlist, null)
+
+            val recyclerView = view.findViewById<RecyclerView>(R.id.recyclerViewSelectPlaylist)
+            val btnCancel = view.findViewById<Button>(R.id.btnSelectPlaylistCancel)
+
+            btnCancel.setOnClickListener { dialog.dismiss() }
+
+            val optionsList = mutableListOf<Playlist>()
+            val newPlaylistItem = Playlist(id = -1L, name = "+ New Playlist", songIds = mutableListOf())
+            optionsList.add(newPlaylistItem)
+            optionsList.addAll(playlists)
+
+            recyclerView.layoutManager = LinearLayoutManager(this)
+            val adapter = PlaylistAdapter(optionsList, object : PlaylistAdapter.OnPlaylistClickListener {
+                override fun onPlaylistClick(position: Int) {
+                    dialog.dismiss()
+                    if (position == 0) {
+                        val createDialog = AlertDialog.Builder(this@MainActivity).create()
+                        val createView = layoutInflater.inflate(R.layout.dialog_input_text, null)
+
+                        val titleText = createView.findViewById<TextView>(R.id.dialogInputTitle)
+                        val input = createView.findViewById<EditText>(R.id.dialogInputField)
+                        val btnCancelNew = createView.findViewById<Button>(R.id.btnInputCancel)
+                        val btnConfirmNew = createView.findViewById<Button>(R.id.btnInputConfirm)
+
+                        titleText.text = "New Playlist"
+                        input.hint = "Playlist Name"
+                        btnConfirmNew.text = "Create & Add"
+
+                        btnCancelNew.setOnClickListener { createDialog.dismiss() }
+
+                        btnConfirmNew.setOnClickListener {
+                            val name = input.text.toString().trim()
+                            if (name.isNotEmpty()) {
+                                createDialog.dismiss()
+                                val newPlaylist = Playlist(
+                                    id = System.currentTimeMillis(),
+                                    name = name,
+                                    songIds = mutableListOf(song.id)
+                                )
+                                playlists.add(newPlaylist)
+                                PlaylistManager.savePlaylists(this@MainActivity, playlists)
+                                if (::pagerAdapter.isInitialized) {
+                                    pagerAdapter.playlistsFragment.refreshPlaylists()
+                                }
+                                Toast.makeText(this@MainActivity, "Created \"$name\" and added song", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(this@MainActivity, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+
+                        createDialog.setView(createView)
+                        createDialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+                        createDialog.show()
+                    } else {
+                        val selectedPlaylist = playlists[position - 1]
+                        if (!selectedPlaylist.songIds.contains(song.id)) {
+                            selectedPlaylist.songIds.add(song.id)
+                            PlaylistManager.savePlaylists(this@MainActivity, playlists)
+                            if (::pagerAdapter.isInitialized) {
+                                pagerAdapter.playlistsFragment.refreshPlaylists()
+                            }
+                            Toast.makeText(this@MainActivity, "Added to \"${selectedPlaylist.name}\"", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this@MainActivity, "Song already in \"${selectedPlaylist.name}\"", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            })
+            recyclerView.adapter = adapter
+
+            dialog.setView(view)
+            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+            dialog.show()
+        }
+    }
+
+    fun showEditSongDialog(position: Int) {
         if (position !in songList.indices) return
         val song = songList[position]
         tempSelectedImageUri = null
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(50, 30, 50, 10)
-        }
+        val dialog = AlertDialog.Builder(this).create()
+        val view = layoutInflater.inflate(R.layout.dialog_edit_song, null)
 
-        val coverPreview = ImageView(this).apply {
-            val params = LinearLayout.LayoutParams(160, 160).apply {
-                bottomMargin = 20
-            }
-            layoutParams = params
-            scaleType = ImageView.ScaleType.CENTER_CROP
-        }
+        val coverPreview = view.findViewById<ImageView>(R.id.editSongCoverPreview)
+        val btnChangeArt = view.findViewById<Button>(R.id.btnChangeCoverImage)
+        val inputTitle = view.findViewById<EditText>(R.id.inputEditSongTitle)
+        val inputArtist = view.findViewById<EditText>(R.id.inputEditSongArtist)
+        val btnCancel = view.findViewById<Button>(R.id.btnEditSongCancel)
+        val btnSave = view.findViewById<Button>(R.id.btnEditSongSave)
+
         activeDialogCoverPreview = coverPreview
 
         Glide.with(this)
@@ -363,69 +755,47 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             .placeholder(R.drawable.baseline_music_note_24)
             .into(coverPreview)
 
-        val inputTitle = EditText(this).apply {
-            hint = "Song Title"
-            setText(song.title)
-            setTextColor(getColor(R.color.white))
-            setHintTextColor(getColor(R.color.light_gray))
-        }
+        inputTitle.setText(song.title)
+        inputArtist.setText(song.artist)
 
-        val inputArtist = EditText(this).apply {
-            hint = "Artist Name"
-            setText(song.artist)
-            setTextColor(getColor(R.color.white))
-            setHintTextColor(getColor(R.color.light_gray))
-        }
-
-        val changeArtButton = Button(this).apply {
-            text = "Change Cover Image"
-            setTextColor(getColor(R.color.white))
-            setBackgroundColor(Color.parseColor("#2A2A2A"))
-            setOnClickListener {
-                val options = arrayOf("Search Device Files", "Search Web")
-                AlertDialog.Builder(this@MainActivity)
-                    .setTitle("Choose Image Source")
-                    .setItems(options) { _, which ->
-                        when (which) {
-                            0 -> pickImageLauncher.launch("image/*")
-                            1 -> {
-                                val currentTitle = inputTitle.text.toString().trim()
-                                val currentArtist = inputArtist.text.toString().trim()
-                                val query = "$currentTitle $currentArtist album cover".trim()
-                                val webIntent = Intent(this@MainActivity, WebCoverPickerActivity::class.java).apply {
-                                    putExtra("search_query", query)
-                                }
-                                webCoverLauncher.launch(webIntent)
+        btnChangeArt.setOnClickListener {
+            val options = arrayOf("Search Device Files", "Search Web")
+            AlertDialog.Builder(this)
+                .setTitle("Choose Image Source")
+                .setItems(options) { _, which ->
+                    when (which) {
+                        0 -> pickImageLauncher.launch("image/*")
+                        1 -> {
+                            val currentTitle = inputTitle.text.toString().trim()
+                            val currentArtist = inputArtist.text.toString().trim()
+                            val query = "$currentTitle $currentArtist album cover".trim()
+                            val webIntent = Intent(this, WebCoverPickerActivity::class.java).apply {
+                                putExtra("search_query", query)
                             }
+                            webCoverLauncher.launch(webIntent)
                         }
                     }
-                    .show()
+                }
+                .show()
+        }
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnSave.setOnClickListener {
+            val newTitle = inputTitle.text.toString().trim()
+            val newArtist = inputArtist.text.toString().trim()
+            val imageToSave = tempSelectedImageUri
+            if (newTitle.isNotEmpty()) {
+                dialog.dismiss()
+                updateSongMetadata(position, newTitle, newArtist, imageToSave)
+            } else {
+                Toast.makeText(this, "Title cannot be empty", Toast.LENGTH_SHORT).show()
             }
         }
 
-        layout.addView(coverPreview)
-        layout.addView(changeArtButton)
-        layout.addView(inputTitle)
-        layout.addView(inputArtist)
-
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("Edit Song Info")
-            .setView(layout)
-            .setPositiveButton("Save") { _, _ ->
-                val newTitle = inputTitle.text.toString().trim()
-                val newArtist = inputArtist.text.toString().trim()
-                val imageToSave = tempSelectedImageUri
-                if (newTitle.isNotEmpty()) {
-                    updateSongMetadata(position, newTitle, newArtist, imageToSave)
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .create()
-
+        dialog.setView(view)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
-
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(getColor(R.color.white))
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(getColor(R.color.white))
     }
 
     private fun updateSongMetadata(position: Int, newTitle: String, newArtist: String, newImageUri: Uri?) {
@@ -445,7 +815,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 pendingEditSong = PendingEdit(position, newTitle, newArtist, newImageUri)
                 val writeRequest = MediaStore.createWriteRequest(contentResolver, listOf(songUri))
-                editMediaLauncher.launch(IntentSenderRequest.Builder(writeRequest.intentSender).build())
+                editMediaLauncher.launch(IntentSenderRequest.Builder(writeRequest).build())
             } else {
                 applySongEditToApp(position, newTitle, newArtist, newImageUri)
             }
@@ -459,7 +829,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
                 } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     pendingEditSong = PendingEdit(position, newTitle, newArtist, newImageUri)
                     val writeRequest = MediaStore.createWriteRequest(contentResolver, listOf(songUri))
-                    editMediaLauncher.launch(IntentSenderRequest.Builder(writeRequest.intentSender).build())
+                    editMediaLauncher.launch(IntentSenderRequest.Builder(writeRequest).build())
                 } else {
                     Toast.makeText(this, "Permission required to edit song", Toast.LENGTH_SHORT).show()
                 }
@@ -501,14 +871,22 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener, SongA
             saveCustomAlbumArt(oldSong.id, oldSong.albumId, newImageUri)
         }
 
-        val updatedSong = Song(oldSong.id, newTitle, newArtist, oldSong.data, oldSong.albumId)
+        val updatedSong = Song(oldSong.id, newTitle, newArtist, oldSong.data, oldSong.albumId, oldSong.duration)
         (songList as? MutableList)?.set(position, updatedSong)
-        adapter.notifyItemChanged(position)
+        if (::pagerAdapter.isInitialized) {
+            val adapterSongs = pagerAdapter.songsFragment.songAdapter?.songs
+            if (adapterSongs != null && position in adapterSongs.indices) {
+                adapterSongs[position] = updatedSong
+                pagerAdapter.songsFragment.songAdapter?.notifyItemChanged(position)
+            }
+        }
 
         val srv = audioService
         if (srv != null) {
             srv.updateActiveSongMetadata(updatedSong)
         }
+
+        updateMiniPlayerUI()
 
         Toast.makeText(this, "Song updated permanently", Toast.LENGTH_SHORT).show()
     }
