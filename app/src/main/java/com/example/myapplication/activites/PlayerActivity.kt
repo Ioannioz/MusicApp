@@ -124,11 +124,7 @@ class PlayerActivity : AppCompatActivity() {
             val isSameSongPlaying = isPlayingOrPrepared && currentSong != null && targetSong != null && currentSong.id == targetSong.id && srv.songList.size == songList.size && srv.songList.map { it.id } == songList.map { it.id }
 
             if (!isSameSongPlaying) {
-                srv.songList = songList
-                if (!srv.isShuffle) {
-                    srv.shuffledList = songList.toMutableList()
-                }
-                srv.playSongAtIndex(currentIndex)
+                srv.playNewList(songList, currentIndex)
             }
 
             val activeSong = srv.getCurrentSong() ?: targetSong
