@@ -63,13 +63,13 @@ class SongAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
         init {
             binding.root.setOnClickListener {
-                val pos = adapterPosition
+                val pos = bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) {
                     listener.onItemClick(pos)
                 }
             }
             binding.btnOptions.setOnClickListener {
-                val pos = adapterPosition
+                val pos = bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) {
                     optionsClickListener?.onOptionsClick(pos, binding.btnOptions)
                 }
@@ -84,7 +84,7 @@ class SongAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
         init {
             val clickHandler = View.OnClickListener {
-                val pos = adapterPosition
+                val pos = bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) {
                     listener.onItemClick(pos)
                 }
@@ -92,7 +92,7 @@ class SongAdapter(
             binding.root.setOnClickListener(clickHandler)
             binding.cardAlbumArt.setOnClickListener(clickHandler)
             binding.btnOptions.setOnClickListener {
-                val pos = adapterPosition
+                val pos = bindingAdapterPosition
                 if (pos != RecyclerView.NO_POSITION) {
                     optionsClickListener?.onOptionsClick(pos, binding.btnOptions)
                 }

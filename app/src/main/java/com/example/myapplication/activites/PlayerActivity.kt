@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.Toast
+import com.example.myapplication.util.ToastHelper
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.coordinatorlayout.widget.CoordinatorLayout
@@ -93,7 +94,7 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Toast.makeText(this@PlayerActivity, "Error playing song: ${error.message}", Toast.LENGTH_SHORT).show()
+            ToastHelper.showToast(this@PlayerActivity, "Error playing song: ${error.message}")
         }
     }
 
@@ -214,7 +215,7 @@ class PlayerActivity : AppCompatActivity() {
         currentIndex = intent.getIntExtra("position", 0)
 
         if (songs == null || songs.isEmpty()) {
-            Toast.makeText(this, "No songs found", Toast.LENGTH_SHORT).show()
+            ToastHelper.showToast(this, "No songs found")
             finish()
             return
         }
@@ -548,7 +549,7 @@ class PlayerActivity : AppCompatActivity() {
                 val isLiked = PlaylistManager.toggleLikeSong(this@PlayerActivity, song.id)
                 updateFavoriteButton(song)
                 val msg = if (isLiked) "Added to Favorites" else "Removed from Favorites"
-                Toast.makeText(this@PlayerActivity, msg, Toast.LENGTH_SHORT).show()
+                ToastHelper.showToast(this@PlayerActivity, msg)
             }
             buttonPlay.setOnClickListener { togglePlayPause() }
             buttonNext.setOnClickListener { playNext() }

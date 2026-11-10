@@ -24,6 +24,7 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import com.example.myapplication.util.ToastHelper
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -143,7 +144,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                     applySongEditToApp(edit.position, edit.newTitle, edit.newArtist, edit.newImageUri)
                 }
             } else {
-                Toast.makeText(this, "Edit cancelled", Toast.LENGTH_SHORT).show()
+                ToastHelper.showToast(this, "Edit cancelled")
             }
             pendingEditSong = null
         }
@@ -183,7 +184,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
             if (audioGranted) {
                 loadSongs()
             } else {
-                Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show()
+                ToastHelper.showToast(this, "Permission denied")
             }
         }
 
@@ -204,12 +205,35 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         checkPermissionAndLoadSong()
         setupMiniPlayerControls()
         setupTabHeaderNavigation()
+
+        com.example.myapplication.model.ThemeManager.addThemeChangeListener(themeChangeListener)
+        applyAppTheme(com.example.myapplication.model.ThemeManager.getSelectedTheme(this))
+    }
+
+    private fun selectTab(position: Int) {
+        val white = getColor(R.color.white)
+        val lightGray = getColor(R.color.light_gray)
+
+        binding.iconHome.setColorFilter(if (position == 0) white else lightGray)
+        binding.textHome.setTextColor(if (position == 0) white else lightGray)
+
+        binding.iconPlaylist.setColorFilter(if (position == 1) white else lightGray)
+        binding.textPlaylist.setTextColor(if (position == 1) white else lightGray)
+
+        binding.iconEqualizer.setColorFilter(if (position == 2) white else lightGray)
+        binding.textEqualizer.setTextColor(if (position == 2) white else lightGray)
+
+        binding.iconStats.setColorFilter(if (position == 3) white else lightGray)
+        binding.textStats.setTextColor(if (position == 3) white else lightGray)
+
+        binding.iconThemes.setColorFilter(if (position == 4) white else lightGray)
+        binding.textThemes.setTextColor(if (position == 4) white else lightGray)
     }
 
     private fun setupTabHeaderNavigation() {
         binding.viewPagerMain.isUserInputEnabled = true
 
-        binding.tabDeviceFiles.setOnClickListener {
+        binding.tabHome.setOnClickListener {
             binding.viewPagerMain.currentItem = 0
         }
 
@@ -217,23 +241,53 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
             binding.viewPagerMain.currentItem = 1
         }
 
+        binding.tabEqualizer.setOnClickListener {
+            binding.viewPagerMain.currentItem = 2
+        }
+
+        binding.tabStats.setOnClickListener {
+            binding.viewPagerMain.currentItem = 3
+        }
+
+        binding.tabThemes.setOnClickListener {
+            binding.viewPagerMain.currentItem = 4
+        }
+
         binding.viewPagerMain.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
-                if (position == 0) {
-                    binding.tabDeviceFiles.setTextColor(getColor(R.color.white))
-                    binding.tabPlaylist.setTextColor(getColor(R.color.light_gray))
-                } else {
-                    binding.tabDeviceFiles.setTextColor(getColor(R.color.light_gray))
-                    binding.tabPlaylist.setTextColor(getColor(R.color.white))
-                }
+                selectTab(position)
             }
         })
+    }
+
+    private val themeChangeListener: (com.example.myapplication.model.AppTheme) -> Unit = { theme ->
+        runOnUiThread {
+            applyAppTheme(theme)
+        }
+    }
+
+    private fun applyAppTheme(theme: com.example.myapplication.model.AppTheme) {
+        val bgColor = android.graphics.Color.parseColor(theme.bgColorHex)
+        val cardColor = android.graphics.Color.parseColor(theme.cardColorHex)
+
+        binding.PlayerRoot.setBackgroundColor(bgColor)
+        binding.miniPlayerLayout.setBackgroundColor(cardColor)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            window.statusBarColor = bgColor
+            window.navigationBarColor = bgColor
+        }
     }
 
     override fun onStart() {
         super.onStart()
         val serviceIntent = Intent(this, AudioService::class.java)
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        com.example.myapplication.model.ThemeManager.removeThemeChangeListener(themeChangeListener)
     }
 
     override fun onResume() {
@@ -396,9 +450,17 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
     }
 
     private fun loadSongs() {
+        reloadSongs()
+    }
+
+    fun reloadSongs() {
         songList = getSongs()
-        pagerAdapter = MainPagerAdapter(this)
-        binding.viewPagerMain.adapter = pagerAdapter
+        if (::pagerAdapter.isInitialized) {
+            pagerAdapter.songsFragment.refreshSongsList()
+        } else {
+            pagerAdapter = MainPagerAdapter(this)
+            binding.viewPagerMain.adapter = pagerAdapter
+        }
     }
 
     private fun saveSongMetadataToPrefs(songId: Long, title: String, artist: String) {
@@ -483,9 +545,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
     fun getSongList(): List<Song> = songList
 
     private fun showQueueNotification(message: String) {
-        activeQueueToast?.cancel()
-        activeQueueToast = Toast.makeText(this, message, Toast.LENGTH_SHORT)
-        activeQueueToast?.show()
+        ToastHelper.showToast(this, message)
     }
 
     fun addSongToQueueByPosition(position: Int) {
@@ -645,9 +705,9 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                     if (::pagerAdapter.isInitialized) {
                         pagerAdapter.playlistsFragment.refreshPlaylists()
                     }
-                    Toast.makeText(this, "Created \"$name\" and added song", Toast.LENGTH_SHORT).show()
+                    ToastHelper.showToast(this, "Created \"$name\" and added song")
                 } else {
-                    Toast.makeText(this, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                    ToastHelper.showToast(this, "Name cannot be empty")
                 }
             }
 
@@ -701,9 +761,9 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                                 if (::pagerAdapter.isInitialized) {
                                     pagerAdapter.playlistsFragment.refreshPlaylists()
                                 }
-                                Toast.makeText(this@MainActivity, "Created \"$name\" and added song", Toast.LENGTH_SHORT).show()
+                                ToastHelper.showToast(this@MainActivity, "Created \"$name\" and added song")
                             } else {
-                                Toast.makeText(this@MainActivity, "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                                ToastHelper.showToast(this@MainActivity, "Name cannot be empty")
                             }
                         }
 
@@ -718,9 +778,9 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                             if (::pagerAdapter.isInitialized) {
                                 pagerAdapter.playlistsFragment.refreshPlaylists()
                             }
-                            Toast.makeText(this@MainActivity, "Added to \"${selectedPlaylist.name}\"", Toast.LENGTH_SHORT).show()
+                            ToastHelper.showToast(this@MainActivity, "Added to \"${selectedPlaylist.name}\"")
                         } else {
-                            Toast.makeText(this@MainActivity, "Song already in \"${selectedPlaylist.name}\"", Toast.LENGTH_SHORT).show()
+                            ToastHelper.showToast(this@MainActivity, "Song already in \"${selectedPlaylist.name}\"")
                         }
                     }
                 }
@@ -789,7 +849,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                 dialog.dismiss()
                 updateSongMetadata(position, newTitle, newArtist, imageToSave)
             } else {
-                Toast.makeText(this, "Title cannot be empty", Toast.LENGTH_SHORT).show()
+                ToastHelper.showToast(this, "Title cannot be empty")
             }
         }
 
@@ -831,13 +891,13 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                     val writeRequest = MediaStore.createWriteRequest(contentResolver, listOf(songUri))
                     editMediaLauncher.launch(IntentSenderRequest.Builder(writeRequest).build())
                 } else {
-                    Toast.makeText(this, "Permission required to edit song", Toast.LENGTH_SHORT).show()
+                    ToastHelper.showToast(this, "Permission required to edit song")
                 }
             } else {
-                Toast.makeText(this, "Failed to edit song", Toast.LENGTH_SHORT).show()
+                ToastHelper.showToast(this, "Failed to edit song")
             }
         } catch (e: Exception) {
-            Toast.makeText(this, "Error updating song: ${e.message}", Toast.LENGTH_SHORT).show()
+            ToastHelper.showToast(this, "Error updating song: ${e.message}")
         }
     }
 
@@ -858,7 +918,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                 Glide.get(applicationContext).clearDiskCache()
             }.start()
         } catch (e: Exception) {
-            Toast.makeText(this, "Failed to save cover image", Toast.LENGTH_SHORT).show()
+            ToastHelper.showToast(this, "Failed to save cover image")
         }
     }
 
@@ -888,6 +948,6 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
         updateMiniPlayerUI()
 
-        Toast.makeText(this, "Song updated permanently", Toast.LENGTH_SHORT).show()
+        ToastHelper.showToast(this, "Song updated permanently")
     }
 }

@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.Toast
+import com.example.myapplication.util.ToastHelper
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -32,7 +33,7 @@ class SplashActivity : AppCompatActivity() {
             if (audioGranted) {
                 loadAppAndNavigate()
             } else {
-                Toast.makeText(this, "Permission required to load songs", Toast.LENGTH_SHORT).show()
+                ToastHelper.showToast(this, "Permission required to load songs")
                 navigateToMain()
             }
         }

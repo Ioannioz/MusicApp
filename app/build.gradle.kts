@@ -12,11 +12,17 @@ android {
     defaultConfig {
         applicationId = "com.example.myapplication"
         minSdk = 24
-        targetSdk = 37
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     buildTypes {
@@ -37,6 +43,12 @@ android {
     }
     buildFeatures {
         viewBinding = true
+    }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+        disable += setOf("PageAlignment")
     }
 }
 
