@@ -197,7 +197,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.PlayerRoot) { _, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            binding.miniPlayerLayout.updateLayoutParams<ConstraintLayout.LayoutParams> {
+            binding.tabHeaderLayout.updateLayoutParams<ConstraintLayout.LayoutParams> {
                 bottomMargin = systemBars.bottom
             }
             insets

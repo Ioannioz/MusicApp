@@ -73,6 +73,10 @@ class PlayerActivity : AppCompatActivity() {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             updatePlayPauseButtonOnIcon()
             updatePlayerMiniPlayerUI()
+            handle.removeCallbacks(updateRunnable)
+            if (isPlaying) {
+                handle.post(updateRunnable)
+            }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -107,6 +111,11 @@ class PlayerActivity : AppCompatActivity() {
             audioService?.getCurrentSong()?.let { updateUI(it) }
             refreshEmbeddedQueueData()
             updatePlayerMiniPlayerUI()
+
+            if (player?.isPlaying == true) {
+                handle.removeCallbacks(updateRunnable)
+                handle.post(updateRunnable)
+            }
         }
     }
 
@@ -161,12 +170,12 @@ class PlayerActivity : AppCompatActivity() {
     private val updateRunnable = object : Runnable {
         override fun run() {
             player?.let { p ->
+                val currentPosition = p.currentPosition
+                val duration = p.duration
+                if (duration > 0 && !isUserScrubbingPlayerMini) {
+                    updateAllProgressViews(currentPosition, duration)
+                }
                 if (p.isPlaying) {
-                    val currentPosition = p.currentPosition
-                    val duration = p.duration
-                    if (duration > 0 && !isUserScrubbingPlayerMini) {
-                        updateAllProgressViews(currentPosition, duration)
-                    }
                     handle.postDelayed(this, 30)
                 }
             }
@@ -607,6 +616,11 @@ class PlayerActivity : AppCompatActivity() {
         updatePlayPauseButtonOnIcon()
         updatePlayerMiniPlayerUI()
         refreshEmbeddedQueueData()
+
+        handle.removeCallbacks(updateRunnable)
+        if (player?.isPlaying == true) {
+            handle.post(updateRunnable)
+        }
     }
 
     private fun toggleRepeat() {
@@ -733,11 +747,16 @@ class PlayerActivity : AppCompatActivity() {
         val cardColor = android.graphics.Color.parseColor(theme.cardColorHex)
         val accentColor = android.graphics.Color.parseColor(theme.accentColorHex)
 
+        val isLightAccent = theme.accentColorHex.equals("#FFFFFF", ignoreCase = true) || theme.accentColorHex.equals("#DBD8E3", ignoreCase = true)
+        val playIconTint = if (isLightAccent) android.graphics.Color.BLACK else android.graphics.Color.WHITE
+
         binding.PlayerRoot.setBackgroundColor(bgColor)
         binding.miniPlayerLayoutPlayer.setBackgroundColor(cardColor)
         binding.embeddedQueueSheet.setBackgroundColor(cardColor)
         binding.waveformSeekBar.setWaveProgressColor(accentColor)
-        binding.buttonPlay.setColorFilter(accentColor)
+
+        binding.buttonPlay.backgroundTintList = android.content.res.ColorStateList.valueOf(accentColor)
+        binding.buttonPlay.setColorFilter(playIconTint)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window.statusBarColor = bgColor

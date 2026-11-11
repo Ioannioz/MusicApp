@@ -8,18 +8,166 @@
     android:background="@color/black"
     tools:context=".activites.MainActivity">
 
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/viewPagerMain"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="36dp"
+        app:layout_constraintBottom_toTopOf="@+id/miniPlayerLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/miniPlayerLayout"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="#121212"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@+id/tabHeaderLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <ImageView
+            android:id="@+id/miniAlbumArt"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_marginStart="8dp"
+            android:contentDescription="@null"
+            android:scaleType="centerCrop"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:src="@drawable/baseline_music_note_24" />
+
+        <LinearLayout
+            android:id="@+id/textContainer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/miniBtnPrev"
+            app:layout_constraintStart_toEndOf="@+id/miniAlbumArt"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextView
+                android:id="@+id/miniTextTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:singleLine="true"
+                android:textColor="@color/white"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                tools:text="Song Title" />
+
+            <TextView
+                android:id="@+id/miniTextArtist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textColor="@color/light_gray"
+                android:textSize="11sp"
+                tools:text="Artist Name" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/miniTextElapsed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/light_gray"
+                    android:textSize="10sp"
+                    tools:text="0:00" />
+
+                <SeekBar
+                    android:id="@+id/miniSeekBar"
+                    android:layout_width="0dp"
+                    android:layout_height="24dp"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:max="1000"
+                    android:maxHeight="1.5dp"
+                    android:minHeight="1.5dp"
+                    android:paddingStart="8dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="10dp"
+                    android:progressDrawable="@drawable/bg_mini_seekbar_track"
+                    android:thumb="@drawable/bg_mini_seekbar_thumb"
+                    android:thumbOffset="0dp" />
+
+            </LinearLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/miniBtnPrev"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@null"
+            android:padding="10dp"
+            android:src="@drawable/baseline_skip_previous_24"
+            app:tint="@color/white"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/miniBtnPlay"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/miniBtnPlay"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@null"
+            android:padding="10dp"
+            android:src="@drawable/baseline_play_arrow_24"
+            app:tint="@color/white"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@+id/miniBtnNext"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/miniBtnNext"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@null"
+            android:padding="10dp"
+            android:src="@drawable/baseline_skip_next_24"
+            app:tint="@color/white"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
     <LinearLayout
         android:id="@+id/tabHeaderLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="36dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="12dp"
+        android:paddingTop="6dp"
         android:paddingEnd="12dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintStart_toStartOf="parent">
 
         <LinearLayout
             android:id="@+id/tabHome"
@@ -187,152 +335,5 @@
         </LinearLayout>
 
     </LinearLayout>
-
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/viewPagerMain"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        app:layout_constraintBottom_toTopOf="@+id/miniPlayerLayout"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tabHeaderLayout" />
-
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/miniPlayerLayout"
-        android:layout_width="match_parent"
-        android:layout_height="72dp"
-        android:background="#121212"
-        android:clickable="true"
-        android:focusable="true"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
-
-        <ImageView
-            android:id="@+id/miniAlbumArt"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:layout_marginStart="8dp"
-            android:contentDescription="@null"
-            android:scaleType="centerCrop"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:src="@drawable/baseline_music_note_24" />
-
-        <LinearLayout
-            android:id="@+id/textContainer"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="8dp"
-            android:orientation="vertical"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/miniBtnPrev"
-            app:layout_constraintStart_toEndOf="@+id/miniAlbumArt"
-            app:layout_constraintTop_toTopOf="parent">
-
-            <TextView
-                android:id="@+id/miniTextTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="marquee"
-                android:marqueeRepeatLimit="marquee_forever"
-                android:singleLine="true"
-                android:textColor="@color/white"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                tools:text="Song Title" />
-
-            <TextView
-                android:id="@+id/miniTextArtist"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:singleLine="true"
-                android:textColor="@color/light_gray"
-                android:textSize="11sp"
-                tools:text="Artist Name" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/miniTextElapsed"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/light_gray"
-                    android:textSize="10sp"
-                    tools:text="0:00" />
-
-                <SeekBar
-                    android:id="@+id/miniSeekBar"
-                    android:layout_width="0dp"
-                    android:layout_height="24dp"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:max="1000"
-                    android:minHeight="1.5dp"
-                    android:maxHeight="1.5dp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:paddingTop="10dp"
-                    android:paddingBottom="10dp"
-                    android:progressDrawable="@drawable/bg_mini_seekbar_track"
-                    android:thumb="@drawable/bg_mini_seekbar_thumb"
-                    android:thumbOffset="0dp" />
-
-            </LinearLayout>
-        </LinearLayout>
-
-        <ImageView
-            android:id="@+id/miniBtnPrev"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="4dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
-            android:padding="10dp"
-            android:src="@drawable/baseline_skip_previous_24"
-            app:tint="@color/white"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/miniBtnPlay"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <ImageView
-            android:id="@+id/miniBtnPlay"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="4dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
-            android:padding="10dp"
-            android:src="@drawable/baseline_play_arrow_24"
-            app:tint="@color/white"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/miniBtnNext"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <ImageView
-            android:id="@+id/miniBtnNext"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginEnd="8dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@null"
-            android:padding="10dp"
-            android:src="@drawable/baseline_skip_next_24"
-            app:tint="@color/white"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
