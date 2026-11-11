@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <group
+        android:pivotX="12"
+        android:pivotY="12"
+        android:rotation="-45">
+
+        <!-- Top Rectangular Brush Head -->
+        <path
+            android:fillColor="@android:color/white"
+            android:pathData="M6.5,3.5 h11 a1.5,1.5 0 0,1 1.5,1.5 v3.5 a0.5,0.5 0 0,1 -0.5,0.5 h-13 a0.5,0.5 0 0,1 -0.5,-0.5 v-3.5 a1.5,1.5 0 0,1 1.5,-1.5 z" />
+
+        <!-- Lower Body and Handle with Circular Hole -->
+        <path
+            android:fillColor="@android:color/white"
+            android:fillType="evenOdd"
+            android:pathData="M6,10.5 h12 a0.5,0.5 0 0,1 0.5,0.5 v1.5 c0,2 -1,3.5 -2.5,4.5 c-0.8,0.5 -1.5,1.3 -1.5,2.3 a3.5,3.5 0 1,1 -5,0 c0,-1 -0.7,-1.8 -1.5,-2.3 c-1.5,-1 -2.5,-2.5 -2.5,-4.5 v-1.5 a0.5,0.5 0 0,1 0.5,-0.5 z M12,17.8 a1.2,1.2 0 1,0 0,2.4 a1.2,1.2 0 1,0 0,-2.4 z" />
+
+    </group>
+
+</vector>

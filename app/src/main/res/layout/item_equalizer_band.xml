@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    app:cardBackgroundColor="#121212"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:id="@+id/textBandFrequency"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="60 Hz" />
+
+            <TextView
+                android:id="@+id/textBandLevel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:textColor="#1DB954"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                tools:text="+3 dB" />
+
+        </RelativeLayout>
+
+        <SeekBar
+            android:id="@+id/seekBarBand"
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:max="3000"
+            android:minHeight="3dp"
+            android:maxHeight="3dp"
+            android:progressDrawable="@drawable/bg_mini_seekbar_track"
+            android:thumb="@drawable/bg_mini_seekbar_thumb" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/playlist_item"
+    android:layout_width="match_parent"
+    android:layout_height="72dp">
+
+    <ImageView
+        android:id="@+id/imagePlaylistIcon"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginStart="12dp"
+        android:background="#2A2A2A"
+        android:contentDescription="@null"
+        android:padding="12dp"
+        android:src="@drawable/baseline_music_note_24"
+        app:tint="@color/white"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/textPlaylistName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@+id/textSongCount"
+        app:layout_constraintEnd_toStartOf="@+id/btnPlaylistOptions"
+        app:layout_constraintStart_toEndOf="@+id/imagePlaylistIcon"
+        app:layout_constraintTop_toTopOf="@+id/imagePlaylistIcon"
+        tools:text="My Favorite Playlist" />
+
+    <TextView
+        android:id="@+id/textSongCount"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:textColor="@color/light_gray"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toBottomOf="@+id/imagePlaylistIcon"
+        app:layout_constraintEnd_toStartOf="@+id/btnPlaylistOptions"
+        app:layout_constraintStart_toStartOf="@+id/textPlaylistName"
+        app:layout_constraintTop_toBottomOf="@+id/textPlaylistName"
+        tools:text="12 Songs" />
+
+    <ImageView
+        android:id="@+id/btnPlaylistOptions"
+        android:layout_width="48dp"
+        android:layout_height="0dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:contentDescription="@null"
+        android:focusable="true"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/baseline_more_vert_24"
+        app:tint="@color/white"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

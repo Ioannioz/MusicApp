@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="64dp"
+    android:height="64dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64">
+    <!-- Gray Rounded Square Background -->
+    <path
+        android:fillColor="#3E3E3E"
+        android:pathData="M8,0 L56,0 A8,8 0 0,1 64,8 L64,56 A8,8 0 0,1 56,64 L8,64 A8,8 0 0,1 0,56 L0,8 A8,8 0 0,1 8,0 Z" />
+    <!-- Dark Heart Outline perfectly centered & bigger -->
+    <path
+        android:fillColor="#1A1A1A"
+        android:pathData="M38.75,18.24c-2.61,0 -5.12,1.22 -6.75,3.14C30.37,19.45 27.86,18.24 25.25,18.24c-4.62,0 -8.25,3.63 -8.25,8.25c0,5.67 5.1,10.29 12.83,17.31L32,45.76l2.18,-1.98C41.9,36.78 47,32.16 47,26.49c0,-4.62 -3.63,-8.25 -8.25,-8.25zM32.15,41.56l-0.15,0.15l-0.15,-0.15C24.71,35.1 20,30.82 20,26.49c0,-3 2.25,-5.25 5.25,-5.25c2.31,0 4.56,1.49 5.36,3.54h2.81c0.79,-2.06 3.04,-3.54 5.35,-3.54c3,0 5.25,2.25 5.25,5.25c0,4.34 -4.71,8.61 -11.87,15.08z" />
+</vector>
