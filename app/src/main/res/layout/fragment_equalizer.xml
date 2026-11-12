@@ -1,208 +1,201 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/swipeRefreshLayout"
+    android:id="@+id/scrollViewEqualizer"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fillViewport="true">
 
-    <ScrollView
-        android:id="@+id/scrollViewEqualizer"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true">
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:paddingBottom="96dp">
 
-        <LinearLayout
+        <!-- Top Navigation Header -->
+        <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:clipToPadding="false"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:paddingBottom="96dp">
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="16dp">
 
-            <!-- Top Navigation Header -->
-            <RelativeLayout
-                android:layout_width="match_parent"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="16dp">
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:text="Equalizer"
+                android:textColor="@color/white"
+                android:textSize="22sp"
+                android:textStyle="bold" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_alignParentStart="true"
-                    android:layout_centerVertical="true"
-                    android:text="Equalizer"
-                    android:textColor="@color/white"
-                    android:textSize="22sp"
-                    android:textStyle="bold" />
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
                 <LinearLayout
+                    android:id="@+id/btnPresetDropdown"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
+                    android:layout_marginEnd="12dp"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:paddingStart="8dp"
+                    android:paddingTop="4dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="4dp">
 
-                    <LinearLayout
-                        android:id="@+id/btnPresetDropdown"
+                    <TextView
+                        android:id="@+id/textCurrentPreset"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="12dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="8dp"
-                        android:paddingTop="4dp"
-                        android:paddingEnd="8dp"
-                        android:paddingBottom="4dp">
-
-                        <TextView
-                            android:id="@+id/textCurrentPreset"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Flat"
-                            android:textColor="@color/white"
-                            android:textSize="15sp"
-                            android:textStyle="bold" />
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:layout_marginStart="4dp"
-                            android:contentDescription="@null"
-                            android:src="@drawable/baseline_keyboard_arrow_down_24"
-                            app:tint="@color/white" />
-
-                    </LinearLayout>
+                        android:text="Flat"
+                        android:textColor="@color/white"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
 
                     <ImageView
-                        android:id="@+id/btnResetEq"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
-                        android:clickable="true"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="4dp"
                         android:contentDescription="@null"
-                        android:focusable="true"
-                        android:padding="6dp"
-                        android:src="@drawable/baseline_refresh_24"
+                        android:src="@drawable/baseline_keyboard_arrow_down_24"
                         app:tint="@color/white" />
 
                 </LinearLayout>
 
-            </RelativeLayout>
+                <ImageView
+                    android:id="@+id/btnResetEq"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:clickable="true"
+                    android:contentDescription="@null"
+                    android:focusable="true"
+                    android:padding="6dp"
+                    android:src="@drawable/baseline_refresh_24"
+                    app:tint="@color/white" />
 
-            <!-- Main Graphic EQ Card -->
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardGraphicEq"
+            </LinearLayout>
+
+        </RelativeLayout>
+
+        <!-- Main Graphic EQ Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardGraphicEq"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="#121212"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="#121212"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="0dp">
+                android:orientation="vertical"
+                android:padding="16dp">
 
-                <LinearLayout
+                <!-- Card Header -->
+                <RelativeLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:layout_marginBottom="12dp">
 
-                    <!-- Card Header -->
-                    <RelativeLayout
-                        android:layout_width="match_parent"
+                    <LinearLayout
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp">
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentStart="true"
-                            android:layout_centerVertical="true"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <ImageView
-                                android:layout_width="22dp"
-                                android:layout_height="22dp"
-                                android:layout_marginEnd="10dp"
-                                android:contentDescription="@null"
-                                android:src="@drawable/baseline_equalizer_24"
-                                app:tint="@color/white" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Graphic EQ"
-                                android:textColor="@color/white"
-                                android:textSize="16sp"
-                                android:textStyle="bold" />
-
-                        </LinearLayout>
-
-                        <com.google.android.material.switchmaterial.SwitchMaterial
-                            android:id="@+id/switchEqualizerMaster"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true"
-                            android:checked="true"
-                            app:useMaterialThemeColors="false" />
-
-                    </RelativeLayout>
-
-                    <!-- Interactive Graphic EQ Spectrum Canvas -->
-                    <com.example.myapplication.util.GraphicEqView
-                        android:id="@+id/graphicEqView"
-                        android:layout_width="match_parent"
-                        android:layout_height="270dp"
-                        android:layout_marginBottom="16dp" />
-
-                    <!-- Post-gain Control Section -->
-                    <RelativeLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="4dp">
+                        <ImageView
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_marginEnd="10dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/baseline_equalizer_24"
+                            app:tint="@color/white" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_alignParentStart="true"
-                            android:text="Post-gain"
+                            android:text="Graphic EQ"
                             android:textColor="@color/white"
-                            android:textSize="14sp"
+                            android:textSize="16sp"
                             android:textStyle="bold" />
 
-                        <TextView
-                            android:id="@+id/textPostGainVal"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentEnd="true"
-                            android:text="0.0dB"
-                            android:textColor="@color/white"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
+                    </LinearLayout>
 
-                    </RelativeLayout>
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switchEqualizerMaster"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:checked="true"
+                        app:useMaterialThemeColors="false" />
 
-                    <SeekBar
-                        android:id="@+id/seekBarPostGain"
-                        android:layout_width="match_parent"
-                        android:layout_height="28dp"
-                        android:max="1000"
-                        android:maxHeight="3dp"
-                        android:minHeight="3dp"
-                        android:progressDrawable="@drawable/bg_mini_seekbar_track"
-                        android:thumb="@drawable/bg_mini_seekbar_thumb" />
+                </RelativeLayout>
 
-                </LinearLayout>
+                <!-- Interactive Graphic EQ Spectrum Canvas -->
+                <com.example.myapplication.util.GraphicEqView
+                    android:id="@+id/graphicEqView"
+                    android:layout_width="match_parent"
+                    android:layout_height="270dp"
+                    android:layout_marginBottom="16dp" />
 
-            </androidx.cardview.widget.CardView>
+                <!-- Post-gain Control Section -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp">
 
-        </LinearLayout>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:text="Post-gain"
+                        android:textColor="@color/white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
 
-    </ScrollView>
+                    <TextView
+                        android:id="@+id/textPostGainVal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:text="0.0dB"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
 
-</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+                </RelativeLayout>
+
+                <SeekBar
+                    android:id="@+id/seekBarPostGain"
+                    android:layout_width="match_parent"
+                    android:layout_height="28dp"
+                    android:max="1000"
+                    android:maxHeight="3dp"
+                    android:minHeight="3dp"
+                    android:progressDrawable="@drawable/bg_mini_seekbar_track"
+                    android:thumb="@drawable/bg_mini_seekbar_thumb" />
+
+            </LinearLayout>
+
+        </androidx.cardview.widget.CardView>
+
+    </LinearLayout>
+
+</ScrollView>

@@ -58,11 +58,6 @@ class ThemesFragment : Fragment() {
         binding.recyclerViewThemes.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerViewThemes.adapter = themeAdapter
 
-        binding.swipeRefreshLayout.setColorSchemeColors(Color.parseColor("#1DB954"))
-        binding.swipeRefreshLayout.setOnRefreshListener {
-            binding.swipeRefreshLayout.isRefreshing = false
-        }
-
         ThemeManager.addThemeChangeListener(themeChangeListener)
         applyTheme(ThemeManager.getSelectedTheme(requireContext()))
     }

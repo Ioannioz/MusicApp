@@ -105,7 +105,17 @@ class QueueAdapter(
             }
             is QueueListItem.DividerItem -> {
                 val dividerViewHolder = holder as DividerViewHolder
+                val theme = com.example.myapplication.model.ThemeManager.getSelectedTheme(dividerViewHolder.binding.root.context)
+                val accentColor = Color.parseColor(theme.accentColorHex)
+
                 dividerViewHolder.binding.textDividerTitle.text = item.title
+                if (item.title == "Now Playing") {
+                    dividerViewHolder.binding.textDividerTitle.setTextColor(accentColor)
+                    dividerViewHolder.binding.textDividerTitle.setTypeface(null, android.graphics.Typeface.BOLD)
+                } else {
+                    dividerViewHolder.binding.textDividerTitle.setTextColor(Color.parseColor("#9CA3AF"))
+                    dividerViewHolder.binding.textDividerTitle.setTypeface(null, android.graphics.Typeface.NORMAL)
+                }
             }
         }
     }

@@ -450,23 +450,31 @@ class PlayerActivity : AppCompatActivity() {
         val currentSong = srv.getCurrentSong()
 
         val sourceName = intent.getStringExtra("playlistName") ?: "Device Files"
-        val dividerTitle = "Next from $sourceName"
-
         val queueItems = mutableListOf<QueueListItem>()
         var totalSongsCount = 0
 
+        // 1. Now Playing Section (YouTube Music Style)
+        if (currentSong != null) {
+            queueItems.add(QueueListItem.DividerItem("Now Playing"))
+            queueItems.add(QueueListItem.SongItem(currentSong))
+            totalSongsCount++
+        }
+
+        // 2. User Queue (Manually added songs)
         if (srv.userQueue.isNotEmpty()) {
+            queueItems.add(QueueListItem.DividerItem("From User Queue"))
             srv.userQueue.forEach {
                 queueItems.add(QueueListItem.SongItem(it))
                 totalSongsCount++
             }
-            queueItems.add(QueueListItem.DividerItem(dividerTitle))
         }
 
+        // 3. Up Next Section
         if (activeList.isNotEmpty() && srv.currentIndex in activeList.indices) {
+            queueItems.add(QueueListItem.DividerItem("Up Next • $sourceName"))
             val currIdx = srv.currentIndex
 
-            for (i in currIdx until activeList.size) {
+            for (i in (currIdx + 1) until activeList.size) {
                 queueItems.add(QueueListItem.SongItem(activeList[i]))
                 totalSongsCount++
             }
@@ -475,10 +483,13 @@ class PlayerActivity : AppCompatActivity() {
                 queueItems.add(QueueListItem.SongItem(activeList[i]))
                 totalSongsCount++
             }
-        } else {
+        } else if (activeList.isNotEmpty()) {
+            queueItems.add(QueueListItem.DividerItem("Up Next • $sourceName"))
             activeList.forEach {
-                queueItems.add(QueueListItem.SongItem(it))
-                totalSongsCount++
+                if (it.id != currentSong?.id) {
+                    queueItems.add(QueueListItem.SongItem(it))
+                    totalSongsCount++
+                }
             }
         }
 
@@ -492,7 +503,11 @@ class PlayerActivity : AppCompatActivity() {
                     if (targetIndex != -1) {
                         srv.playSongAtIndex(targetIndex)
                         updateUI(song)
+                    } else {
+                        srv.playSingleSong(song)
+                        updateUI(song)
                     }
+                    refreshEmbeddedQueueData()
                 }
             })
             binding.recyclerViewQueue.adapter = queueAdapter

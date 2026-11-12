@@ -52,13 +52,6 @@ class EqualizerFragment : Fragment() {
         setupPostGainSeekBar()
         setupTopBarActions()
 
-        binding.swipeRefreshLayout.setColorSchemeColors(android.graphics.Color.parseColor("#1DB954"))
-        binding.swipeRefreshLayout.setOnRefreshListener {
-            setupEqualizerInstance()
-            ToastHelper.showToast(requireContext(), "Equalizer refreshed")
-            binding.swipeRefreshLayout.isRefreshing = false
-        }
-
         com.example.myapplication.model.ThemeManager.addThemeChangeListener(themeChangeListener)
         applyTheme(com.example.myapplication.model.ThemeManager.getSelectedTheme(requireContext()))
     }
@@ -208,10 +201,13 @@ class EqualizerFragment : Fragment() {
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                seekBar?.parent?.requestDisallowInterceptTouchEvent(true)
                 wasSnappedToZero = binding.seekBarPostGain.progress in 470..530
             }
 
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                seekBar?.parent?.requestDisallowInterceptTouchEvent(false)
+            }
         })
     }
 
