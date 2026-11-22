@@ -7,7 +7,6 @@ import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
-import android.widget.ImageView
 import com.example.myapplication.model.ThemeManager
 import com.google.android.material.bottomsheet.BottomSheetDialog
 
@@ -44,6 +43,10 @@ object DialogThemeHelper {
         view.background = drawable
     }
 
+    fun removeDialogWindowBorders(dialog: android.app.Dialog) {
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+    }
+
     fun styleEditText(editText: EditText, context: Context) {
         val theme = ThemeManager.getSelectedTheme(context)
         val cardColor = Color.parseColor(theme.cardColorHex)
@@ -77,7 +80,15 @@ object DialogThemeHelper {
     fun stylePrimaryButton(button: Button, context: Context) {
         val theme = ThemeManager.getSelectedTheme(context)
         val accentColor = Color.parseColor(theme.accentColorHex)
-        button.backgroundTintList = ColorStateList.valueOf(accentColor)
+        val density = context.resources.displayMetrics.density
+
+        val drawable = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = 10f * density
+            setColor(accentColor)
+        }
+        button.background = drawable
+        button.backgroundTintList = null
         button.setTextColor(if (theme.id == "black_white") Color.BLACK else Color.WHITE)
     }
 

@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
     android:paddingTop="12dp">
 
     <!-- Top Section (Handle Bar + Playlist Header + Divider) -->
@@ -11,7 +12,6 @@
         android:id="@+id/detailHeaderSection"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
         android:orientation="vertical">
 
         <View
@@ -115,12 +115,38 @@
 
     </LinearLayout>
 
+    <!-- Middle Content Area (Songs List / Empty Text) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
+        android:layout_weight="1">
+
+        <TextView
+            android:id="@+id/detailEmptyText"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:gravity="center"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="No songs in playlist yet"
+            android:textColor="@color/light_gray"
+            android:textSize="15sp"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewPlaylistSongs"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp" />
+
+    </FrameLayout>
+
     <!-- Mini-Player Bar Anchored at Bottom -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/detailMiniPlayerLayout"
         android:layout_width="match_parent"
         android:layout_height="72dp"
-        android:layout_alignParentBottom="true"
         android:background="#121212"
         android:clickable="true"
         android:focusable="true"
@@ -131,7 +157,9 @@
             android:layout_width="56dp"
             android:layout_height="56dp"
             android:layout_marginStart="8dp"
+            android:clickable="false"
             android:contentDescription="@null"
+            android:focusable="false"
             android:scaleType="centerCrop"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -144,6 +172,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
             android:layout_marginEnd="8dp"
+            android:clickable="false"
+            android:focusable="false"
             android:orientation="vertical"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@+id/detailMiniBtnPrev"
@@ -195,11 +225,11 @@
                     android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:max="1000"
-                    android:minHeight="1.5dp"
                     android:maxHeight="1.5dp"
+                    android:minHeight="1.5dp"
                     android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
                     android:paddingTop="10dp"
+                    android:paddingEnd="8dp"
                     android:paddingBottom="10dp"
                     android:progressDrawable="@drawable/bg_mini_seekbar_track"
                     android:thumb="@drawable/bg_mini_seekbar_thumb"
@@ -253,29 +283,4 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Empty State Text -->
-    <TextView
-        android:id="@+id/detailEmptyText"
-        android:layout_width="match_parent"
-        android:layout_height="120dp"
-        android:layout_below="@id/detailHeaderSection"
-        android:gravity="center"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:text="No songs in playlist yet"
-        android:textColor="@color/light_gray"
-        android:textSize="15sp"
-        android:visibility="gone" />
-
-    <!-- Playlist Songs RecyclerView filling space between Header and Mini-Player -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerViewPlaylistSongs"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_above="@id/detailMiniPlayerLayout"
-        android:layout_below="@id/detailHeaderSection"
-        android:layout_alignWithParentIfMissing="true"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp" />
-
-</RelativeLayout>
+</LinearLayout>

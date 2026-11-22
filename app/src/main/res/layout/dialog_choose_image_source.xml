@@ -140,12 +140,15 @@
         android:id="@+id/btnCancelSource"
         android:layout_width="match_parent"
         android:layout_height="44dp"
-        android:background="@drawable/bg_button_secondary"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
         android:text="Cancel"
         android:textAllCaps="false"
         android:textColor="@color/white"
         android:textSize="14sp"
         android:textStyle="bold"
-        app:backgroundTint="#2D2F31" />
+        app:cornerRadius="10dp"
+        app:elevation="0dp"
+        app:strokeWidth="0dp" />
 
 </LinearLayout>

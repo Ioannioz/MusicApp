@@ -4,7 +4,6 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/bg_dialog_dark"
     android:orientation="vertical"
     android:padding="24dp">
 
@@ -54,8 +53,8 @@
             android:layout_width="wrap_content"
             android:layout_height="44dp"
             android:layout_marginEnd="12dp"
-            app:backgroundTint="#2D2F31"
-            android:background="@drawable/bg_button_secondary"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
             android:paddingStart="24dp"
             android:paddingEnd="24dp"
             android:text="Cancel"
@@ -63,21 +62,26 @@
             android:textColor="@color/white"
             android:textSize="14sp"
             android:textStyle="bold"
-            />
+            app:cornerRadius="10dp"
+            app:elevation="0dp"
+            app:strokeWidth="0dp" />
 
         <Button
             android:id="@+id/btnConfirmDelete"
             android:layout_width="wrap_content"
             android:layout_height="44dp"
-            app:backgroundTint="#2D2F31"
-            android:background="@drawable/bg_button_secondary"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
             android:paddingStart="28dp"
             android:paddingEnd="28dp"
             android:text="Delete"
             android:textAllCaps="false"
             android:textColor="#FF5252"
             android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            app:cornerRadius="10dp"
+            app:elevation="0dp"
+            app:strokeWidth="0dp" />
 
     </LinearLayout>
 

@@ -145,6 +145,7 @@ class PlaylistAdapter(
             iconView.clearColorFilter()
             Glide.with(context)
                 .load(customIconFile)
+                .signature(com.bumptech.glide.signature.ObjectKey(customIconFile.lastModified()))
                 .centerCrop()
                 .placeholder(R.drawable.baseline_music_note_24)
                 .into(iconView)

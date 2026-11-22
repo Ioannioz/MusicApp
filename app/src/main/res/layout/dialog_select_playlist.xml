@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:background="@drawable/bg_dialog_dark"
     android:orientation="vertical"
     android:padding="24dp">
 
@@ -33,15 +32,18 @@
             android:id="@+id/btnSelectPlaylistCancel"
             android:layout_width="wrap_content"
             android:layout_height="44dp"
-            app:backgroundTint="#2D2F31"
-            android:background="@drawable/bg_button_secondary"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
             android:paddingStart="24dp"
             android:paddingEnd="24dp"
             android:text="Cancel"
             android:textAllCaps="false"
             android:textColor="@color/white"
             android:textSize="14sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            app:cornerRadius="10dp"
+            app:elevation="0dp"
+            app:strokeWidth="0dp" />
 
     </LinearLayout>
 

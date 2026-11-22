@@ -68,10 +68,14 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
                     requireContext().contentResolver.openInputStream(uri)?.use { input ->
                         file.outputStream().use { output -> input.copyTo(output) }
                     }
-                    playlistAdapter.notifyItemChanged(activeEditingPlaylistPosition)
-                    ToastHelper.showToast(requireContext(), "Playlist icon updated")
+                    Glide.get(requireContext().applicationContext).clearMemory()
+                    Thread {
+                        Glide.get(requireContext().applicationContext).clearDiskCache()
+                    }.start()
+                    refreshPlaylists()
+                    ToastHelper.showToast(requireContext(), "Cover image updated for ${playlist.name}")
                 } catch (e: Exception) {
-                    ToastHelper.showToast(requireContext(), "Failed to save icon")
+                    ToastHelper.showToast(requireContext(), "Failed to save cover image")
                 }
             }
         }
@@ -132,6 +136,15 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
 
         binding.swipeRefreshLayout.setColorSchemeColors(Color.parseColor("#1DB954"))
         binding.swipeRefreshLayout.setOnRefreshListener {
+            try {
+                Glide.get(requireContext().applicationContext).clearMemory()
+                Thread {
+                    try {
+                        Glide.get(requireContext().applicationContext).clearDiskCache()
+                    } catch (_: Exception) {}
+                }.start()
+            } catch (_: Exception) {}
+
             refreshPlaylists()
             ToastHelper.showToast(requireContext(), "Playlists refreshed")
             binding.swipeRefreshLayout.isRefreshing = false
@@ -245,6 +258,7 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
         com.example.myapplication.util.DialogThemeHelper.styleEditText(input, requireContext())
         com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnConfirm, requireContext())
         com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, requireContext())
+        com.example.myapplication.util.DialogThemeHelper.removeDialogWindowBorders(dialog)
         dialog.show()
     }
 
@@ -338,6 +352,7 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
             iconImg.clearColorFilter()
             Glide.with(requireContext())
                 .load(customIconFile)
+                .signature(com.bumptech.glide.signature.ObjectKey(customIconFile.lastModified()))
                 .centerCrop()
                 .placeholder(R.drawable.baseline_music_note_24)
                 .into(iconImg)
@@ -347,6 +362,13 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
             val pad = (12 * density).toInt()
             iconImg.setPadding(pad, pad, pad, pad)
             iconImg.setColorFilter(accentColor, PorterDuff.Mode.SRC_IN)
+        }
+
+        iconImg.setOnClickListener {
+            activeEditingPlaylistPosition = playlists.indexOfFirst { it.id == playlist.id }
+            if (activeEditingPlaylistPosition != -1) {
+                pickPlaylistIconLauncher.launch("image/*")
+            }
         }
 
         val updateControlIcons = {
@@ -414,6 +436,24 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
 
         val srv = mainAct.getAudioService()
         srv?.addStateChangeListener(playlistSheetStateListener)
+
+        dialog.setOnShowListener {
+            val bottomSheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+            bottomSheet?.setBackgroundColor(cardColor)
+            bottomSheet?.setPadding(0, 0, 0, 0)
+            if (bottomSheet != null) {
+                androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(bottomSheet) { _, insets ->
+                    val sysBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                    miniLayout.setPadding(
+                        miniLayout.paddingLeft,
+                        miniLayout.paddingTop,
+                        miniLayout.paddingRight,
+                        sysBars.bottom
+                    )
+                    insets
+                }
+            }
+        }
 
         dialog.setOnDismissListener {
             srv?.removeStateChangeListener(playlistSheetStateListener)
@@ -791,6 +831,7 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
         com.example.myapplication.util.DialogThemeHelper.styleEditText(input, requireContext())
         com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnConfirm, requireContext())
         com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, requireContext())
+        com.example.myapplication.util.DialogThemeHelper.removeDialogWindowBorders(dialog)
         dialog.show()
     }
 
@@ -827,6 +868,7 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
         com.example.myapplication.util.DialogThemeHelper.styleDialogView(view, requireContext())
         com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, requireContext())
         com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnDelete, requireContext())
+        com.example.myapplication.util.DialogThemeHelper.removeDialogWindowBorders(dialog)
         dialog.show()
     }
 

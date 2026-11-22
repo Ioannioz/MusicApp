@@ -411,6 +411,7 @@ class EqualizerFragment : Fragment() {
         com.example.myapplication.util.DialogThemeHelper.styleEditText(input, requireContext())
         com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnConfirm, requireContext())
         com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, requireContext())
+        com.example.myapplication.util.DialogThemeHelper.removeDialogWindowBorders(dialog)
         dialog.show()
     }
 

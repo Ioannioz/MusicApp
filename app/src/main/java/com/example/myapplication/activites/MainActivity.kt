@@ -779,6 +779,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
             com.example.myapplication.util.DialogThemeHelper.styleEditText(input, this)
             com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnConfirm, this)
             com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, this)
+            com.example.myapplication.util.DialogThemeHelper.removeDialogWindowBorders(dialog)
             dialog.show()
         } else {
             val dialog = AlertDialog.Builder(this).create()
@@ -950,6 +951,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnChangeArt, this)
         com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, this)
         com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnSave, this)
+        com.example.myapplication.util.DialogThemeHelper.removeDialogWindowBorders(dialog)
         dialog.show()
     }
 
