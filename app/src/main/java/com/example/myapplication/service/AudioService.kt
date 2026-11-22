@@ -58,6 +58,7 @@ class AudioService : Service() {
 
     private var historySongId: Long? = null
     private var lastSelectedListIndex: Int = -1
+    private var preQueueListIndex: Int = -1
 
     private val playedSongIds = mutableSetOf<Long>()
     private var notificationManager: PlayerNotificationManager? = null
@@ -343,6 +344,7 @@ class AudioService : Service() {
     fun playNewList(newList: List<Song>, initialIndex: Int) {
         if (newList.isEmpty() || initialIndex !in newList.indices) return
 
+        preQueueListIndex = -1
         songList = newList.toMutableList()
         val targetSong = newList[initialIndex]
 
@@ -413,19 +415,24 @@ class AudioService : Service() {
         }
 
         if (userQueue.isNotEmpty()) {
-            val queuedSong = userQueue.removeFirst()
-            val targetIdx = list.indexOfFirst { it.id == queuedSong.id }
-            if (targetIdx != -1) {
-                playSongAtIndex(targetIdx, addToHistory = true)
-            } else {
-                playSingleSong(queuedSong, addToHistory = true)
+            if (preQueueListIndex == -1) {
+                preQueueListIndex = currentIndex
             }
+            val queuedSong = userQueue.removeFirst()
+            playSingleSong(queuedSong, addToHistory = true)
             return
         }
 
         if (list.isEmpty()) return
 
-        val nextIndex = (currentIndex + 1) % list.size
+        val nextIndex = if (preQueueListIndex != -1) {
+            val idx = (preQueueListIndex + 1) % list.size
+            preQueueListIndex = -1
+            idx
+        } else {
+            (currentIndex + 1) % list.size
+        }
+
         playSongAtIndex(nextIndex, addToHistory = true)
     }
 
@@ -440,14 +447,18 @@ class AudioService : Service() {
 
         if (userQueue.isNotEmpty()) {
             val queuedSong = userQueue.removeFirst()
-            val targetIdx = list.indexOfFirst { it.id == queuedSong.id }
-            if (targetIdx != -1) {
-                playSongAtIndex(targetIdx, addToHistory = false)
-                return
-            }
+            playSingleSong(queuedSong, addToHistory = false)
+            return
         }
 
-        val prevIndex = (currentIndex - 1 + list.size) % list.size
+        val prevIndex = if (preQueueListIndex != -1) {
+            val idx = preQueueListIndex
+            preQueueListIndex = -1
+            idx
+        } else {
+            (currentIndex - 1 + list.size) % list.size
+        }
+
         playSongAtIndex(prevIndex, addToHistory = false)
     }
 

@@ -131,11 +131,19 @@ class PlayerActivity : AppCompatActivity() {
 
             val currentSong = srv.getCurrentSong()
             val isPlayingOrPrepared = srv.player?.let { it.playbackState != Player.STATE_IDLE } == true
-            val targetSong = if (currentIndex in songList.indices) songList[currentIndex] else null
 
+            if (songList.isEmpty() && srv.getActiveList().isNotEmpty()) {
+                songList = srv.getActiveList()
+                currentIndex = srv.currentIndex
+            } else if (songList.isEmpty() && srv.songList.isNotEmpty()) {
+                songList = srv.songList
+                currentIndex = srv.currentIndex
+            }
+
+            val targetSong = if (currentIndex in songList.indices) songList[currentIndex] else null
             val isSameSongPlaying = isPlayingOrPrepared && currentSong != null && targetSong != null && currentSong.id == targetSong.id
 
-            if (!isSameSongPlaying) {
+            if (!isSameSongPlaying && songList.isNotEmpty()) {
                 srv.playNewList(songList, currentIndex)
             }
 
@@ -225,13 +233,9 @@ class PlayerActivity : AppCompatActivity() {
         val songs = intent.getSerializableExtra("songList") as? List<Song>
         currentIndex = intent.getIntExtra("position", 0)
 
-        if (songs == null || songs.isEmpty()) {
-            ToastHelper.showToast(this, "No songs found")
-            finish()
-            return
+        if (songs != null && songs.isNotEmpty()) {
+            songList = songs
         }
-
-        songList = songs
         binding.waveformSeekBar.setWaveProgressColor(getColor(R.color.white))
         binding.waveformSeekBar.setWaveform(createWaveform())
         setupControls()
@@ -776,6 +780,21 @@ class PlayerActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window.statusBarColor = bgColor
             window.navigationBarColor = bgColor
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        @Suppress("UNCHECKED_CAST", "DEPRECATION")
+        val songs = intent.getSerializableExtra("songList") as? List<Song>
+        val pos = intent.getIntExtra("position", 0)
+        if (songs != null && songs.isNotEmpty()) {
+            songList = songs
+            currentIndex = pos
+            audioService?.getCurrentSong()?.let { updateUI(it) }
+            refreshEmbeddedQueueData()
+            updatePlayerMiniPlayerUI()
         }
     }
 

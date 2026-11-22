@@ -153,7 +153,13 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
             } else {
                 binding.searchBarContainer.visibility = View.VISIBLE
                 binding.editSearchPlaylists.requestFocus()
+                com.example.myapplication.util.DialogThemeHelper.styleSearchContainer(binding.searchBarContainer, requireContext())
             }
+        }
+
+        binding.btnCloseSearch.setOnClickListener {
+            binding.editSearchPlaylists.setText("")
+            binding.searchBarContainer.visibility = View.GONE
         }
 
         binding.editSearchPlaylists.addTextChangedListener(object : android.text.TextWatcher {
@@ -893,8 +899,9 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
         binding.root.setBackgroundColor(bgColor)
         binding.btnSearch.setColorFilter(accentColor)
         binding.btnToggleLayout.setColorFilter(accentColor)
+        binding.btnCloseSearch.setColorFilter(accentColor)
 
-        com.example.myapplication.util.DialogThemeHelper.styleEditText(binding.editSearchPlaylists, requireContext())
+        com.example.myapplication.util.DialogThemeHelper.styleSearchContainer(binding.searchBarContainer, requireContext())
         com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(binding.btnCreatePlaylist, requireContext())
 
         if (::playlistAdapter.isInitialized) {

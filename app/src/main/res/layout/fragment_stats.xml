@@ -37,7 +37,7 @@
                 android:textColor="@color/light_gray"
                 android:textSize="13sp" />
 
-            <!-- Usage Cards Row -->
+            <!-- Usage Cards Row (This Week & This Month) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -45,51 +45,12 @@
                 android:baselineAligned="false"
                 android:orientation="horizontal">
 
-                <!-- Today Usage Card -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardTodayUsage"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    app:cardBackgroundColor="#121212"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="0dp">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="16dp">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Today"
-                            android:textColor="@color/light_gray"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/textTodayUsage"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:textColor="#1DB954"
-                            android:textSize="18sp"
-                            android:textStyle="bold"
-                            tools:text="45 mins" />
-
-                    </LinearLayout>
-
-                </androidx.cardview.widget.CardView>
-
                 <!-- Weekly Usage Card -->
                 <androidx.cardview.widget.CardView
                     android:id="@+id/cardWeeklyUsage"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
                     android:layout_weight="1"
                     app:cardBackgroundColor="#121212"
                     app:cardCornerRadius="16dp"
@@ -114,10 +75,49 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:textColor="@color/white"
+                            android:textColor="#1DB954"
                             android:textSize="18sp"
                             android:textStyle="bold"
                             tools:text="3 hr 20 min" />
+
+                    </LinearLayout>
+
+                </androidx.cardview.widget.CardView>
+
+                <!-- Monthly Usage Card -->
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/cardMonthlyUsage"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    app:cardBackgroundColor="#121212"
+                    app:cardCornerRadius="16dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="This Month"
+                            android:textColor="@color/light_gray"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/textMonthlyUsage"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textColor="@color/white"
+                            android:textSize="18sp"
+                            android:textStyle="bold"
+                            tools:text="14 hr 45 min" />
 
                     </LinearLayout>
 
@@ -320,6 +320,44 @@
                         android:text="Play songs to discover your top track this month"
                         android:textColor="@color/light_gray"
                         android:textSize="13sp" />
+
+                </LinearLayout>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Today's Listening Card (At the Bottom) -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardTodayUsage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardBackgroundColor="#121212"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Today's Listening"
+                        android:textColor="@color/light_gray"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/textTodayUsage"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="#1DB954"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        tools:text="45 mins" />
 
                 </LinearLayout>
 

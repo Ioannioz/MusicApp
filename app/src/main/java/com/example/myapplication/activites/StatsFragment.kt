@@ -55,9 +55,11 @@ class StatsFragment : Fragment() {
         // 1. Listening Usage Stats
         val todaySecs = StatsManager.getTodayListeningSeconds(context)
         val weeklySecs = StatsManager.getWeeklyListeningSeconds(context)
+        val monthlySecs = StatsManager.getMonthlyListeningSeconds(context)
 
-        binding.textTodayUsage.text = StatsManager.formatDuration(todaySecs)
         binding.textWeeklyUsage.text = StatsManager.formatDuration(weeklySecs)
+        binding.textMonthlyUsage.text = StatsManager.formatDuration(monthlySecs)
+        binding.textTodayUsage.text = StatsManager.formatDuration(todaySecs)
 
         val allSongs = mainAct?.getSongList() ?: emptyList()
 
@@ -136,11 +138,13 @@ class StatsFragment : Fragment() {
         val accentColor = android.graphics.Color.parseColor(theme.accentColorHex)
 
         binding.root.setBackgroundColor(bgColor)
-        binding.cardTodayUsage.setCardBackgroundColor(cardColor)
         binding.cardWeeklyUsage.setCardBackgroundColor(cardColor)
+        binding.cardMonthlyUsage.setCardBackgroundColor(cardColor)
+        binding.cardTodayUsage.setCardBackgroundColor(cardColor)
         binding.cardTopWeekSong.setCardBackgroundColor(cardColor)
         binding.cardTopMonthSong.setCardBackgroundColor(cardColor)
 
+        binding.textWeeklyUsage.setTextColor(accentColor)
         binding.textTodayUsage.setTextColor(accentColor)
         binding.textTopWeekPlays.setTextColor(accentColor)
         binding.textTopMonthPlays.setTextColor(accentColor)

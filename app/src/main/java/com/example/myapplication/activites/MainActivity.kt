@@ -9,9 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -457,6 +459,45 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         reloadSongs()
     }
 
+    fun scanDeviceForNewSongs() {
+        val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+        val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val filesToScan = mutableListOf<String>()
+
+        fun collectAudioFiles(dir: File?) {
+            if (dir == null || !dir.exists()) return
+            dir.listFiles()?.forEach { file ->
+                if (file.isDirectory) {
+                    collectAudioFiles(file)
+                } else if (file.isFile) {
+                    val ext = file.extension.lowercase(Locale.getDefault())
+                    if (ext == "mp3" || ext == "m4a" || ext == "wav" || ext == "flac" || ext == "aac" || ext == "ogg") {
+                        filesToScan.add(file.absolutePath)
+                    }
+                }
+            }
+        }
+
+        try {
+            collectAudioFiles(musicDir)
+            collectAudioFiles(downloadDir)
+        } catch (_: Exception) {}
+
+        if (filesToScan.isNotEmpty()) {
+            MediaScannerConnection.scanFile(
+                this,
+                filesToScan.toTypedArray(),
+                null
+            ) { _, _ ->
+                runOnUiThread {
+                    reloadSongs()
+                }
+            }
+        } else {
+            reloadSongs()
+        }
+    }
+
     fun reloadSongs() {
         songList = getSongs()
         if (::pagerAdapter.isInitialized) {
@@ -552,13 +593,17 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         ToastHelper.showToast(this, message)
     }
 
-    fun addSongToQueueByPosition(position: Int) {
-        if (position !in songList.indices) return
-        val song = songList[position]
+    fun addSongToQueue(song: Song) {
         val srv = audioService
         if (srv != null) {
             srv.addToQueueEnd(song)
             showQueueNotification("Added \"${song.title ?: "Song"}\" to queue")
+        }
+    }
+
+    fun addSongToQueueByPosition(position: Int) {
+        if (position in songList.indices) {
+            addSongToQueue(songList[position])
         }
     }
 
@@ -615,9 +660,8 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         startActivity(intent)
     }
 
-    fun showSongOptionsMenu(position: Int, anchorView: View) {
-        if (position !in songList.indices) return
-        val song = songList[position]
+    fun showSongOptionsMenu(song: Song, anchorView: View? = null) {
+        val actualPosition = songList.indexOfFirst { it.id == song.id }
 
         val dialog = BottomSheetDialog(this, com.google.android.material.R.style.Theme_Design_BottomSheetDialog)
         val sheetView = layoutInflater.inflate(R.layout.dialog_song_options_bottom_sheet, null)
@@ -645,7 +689,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
             val srv = audioService
             if (srv != null) {
                 srv.playNextSongInQueue(song)
-                showQueueNotification("Will play next")
+                showQueueNotification("Added \"${song.title ?: "Song"}\" to play next")
             }
         }
 
@@ -665,12 +709,28 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
         optionEditInfo.setOnClickListener {
             dialog.dismiss()
-            showEditSongDialog(position)
+            if (actualPosition != -1) {
+                showEditSongDialog(actualPosition)
+            } else {
+                ToastHelper.showToast(this, "Song not found in library")
+            }
+        }
+
+        val optionSetRingtone = sheetView.findViewById<LinearLayout>(R.id.optionSetRingtone)
+        optionSetRingtone?.setOnClickListener {
+            dialog.dismiss()
+            setSongAsPhoneRingtone(song)
         }
 
         dialog.setContentView(sheetView)
         com.example.myapplication.util.DialogThemeHelper.styleBottomSheet(dialog, this)
         dialog.show()
+    }
+
+    fun showSongOptionsMenu(position: Int, anchorView: View) {
+        if (position in songList.indices) {
+            showSongOptionsMenu(songList[position], anchorView)
+        }
     }
 
     private fun showAddToPlaylistDialog(song: Song) {
@@ -891,6 +951,45 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, this)
         com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnSave, this)
         dialog.show()
+    }
+
+    fun setSongAsPhoneRingtone(song: Song) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!android.provider.Settings.System.canWrite(this)) {
+                ToastHelper.showToast(this, "Please allow modifying system settings to set ringtone")
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+                        data = Uri.parse("package:$packageName")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                } catch (_: Exception) {}
+                return
+            }
+        }
+
+        try {
+            val path = song.data
+            if (path.isNullOrEmpty()) {
+                ToastHelper.showToast(this, "Audio file path invalid")
+                return
+            }
+            val file = File(path)
+            if (!file.exists()) {
+                ToastHelper.showToast(this, "Audio file not found on disk")
+                return
+            }
+
+            val songUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, song.id)
+            android.media.RingtoneManager.setActualDefaultRingtoneUri(
+                this,
+                android.media.RingtoneManager.TYPE_RINGTONE,
+                songUri
+            )
+            ToastHelper.showToast(this, "Set \"${song.title ?: "Song"}\" as call ringtone!")
+        } catch (e: Exception) {
+            ToastHelper.showToast(this, "Error setting ringtone: ${e.message}")
+        }
     }
 
     private fun updateSongMetadata(position: Int, newTitle: String, newArtist: String, newImageUri: Uri?) {

@@ -61,9 +61,11 @@ class SongsFragment : Fragment(), SongAdapter.OnItemClickListener, SongAdapter.O
 
         override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
             val pos = viewHolder.bindingAdapterPosition
-            if (pos != RecyclerView.NO_POSITION && direction == ItemTouchHelper.RIGHT) {
+            val adapterSongs = songAdapter?.songs
+            if (adapterSongs != null && pos in adapterSongs.indices && direction == ItemTouchHelper.RIGHT) {
+                val song = adapterSongs[pos]
                 val mainAct = activity as? MainActivity
-                mainAct?.addSongToQueueByPosition(pos)
+                mainAct?.addSongToQueue(song)
                 viewHolder.itemView.translationX = 0f
                 songAdapter?.notifyItemChanged(pos)
             }
@@ -218,8 +220,10 @@ class SongsFragment : Fragment(), SongAdapter.OnItemClickListener, SongAdapter.O
         binding.swipeRefreshLayout.setColorSchemeColors(Color.parseColor("#1DB954"))
         binding.swipeRefreshLayout.setOnRefreshListener {
             val mainAct = activity as? MainActivity
-            mainAct?.reloadSongs()
-            ToastHelper.showToast(requireContext(), "Library refreshed")
+            if (mainAct != null) {
+                mainAct.scanDeviceForNewSongs()
+                ToastHelper.showToast(requireContext(), "Rescanning storage for new songs...")
+            }
             binding.swipeRefreshLayout.isRefreshing = false
         }
 
@@ -235,7 +239,13 @@ class SongsFragment : Fragment(), SongAdapter.OnItemClickListener, SongAdapter.O
             } else {
                 binding.searchBarContainer.visibility = View.VISIBLE
                 binding.editSearchSongs.requestFocus()
+                com.example.myapplication.util.DialogThemeHelper.styleSearchContainer(binding.searchBarContainer, requireContext())
             }
+        }
+
+        binding.btnCloseSearch.setOnClickListener {
+            binding.editSearchSongs.setText("")
+            binding.searchBarContainer.visibility = View.GONE
         }
 
         binding.editSearchSongs.addTextChangedListener(object : android.text.TextWatcher {
@@ -348,7 +358,11 @@ class SongsFragment : Fragment(), SongAdapter.OnItemClickListener, SongAdapter.O
 
     override fun onOptionsClick(position: Int, view: View) {
         val mainAct = activity as? MainActivity ?: return
-        mainAct.showSongOptionsMenu(position, view)
+        val adapterSongs = songAdapter?.songs ?: return
+        if (position in adapterSongs.indices) {
+            val song = adapterSongs[position]
+            mainAct.showSongOptionsMenu(song, view)
+        }
     }
 
     private val themeChangeListener: (com.example.myapplication.model.AppTheme) -> Unit = { theme ->
@@ -365,8 +379,9 @@ class SongsFragment : Fragment(), SongAdapter.OnItemClickListener, SongAdapter.O
         binding.root.setBackgroundColor(bgColor)
         binding.btnSearch.setColorFilter(accentColor)
         binding.btnToggleLayout.setColorFilter(accentColor)
+        binding.btnCloseSearch.setColorFilter(accentColor)
 
-        com.example.myapplication.util.DialogThemeHelper.styleEditText(binding.editSearchSongs, requireContext())
+        com.example.myapplication.util.DialogThemeHelper.styleSearchContainer(binding.searchBarContainer, requireContext())
     }
 
     override fun onDestroyView() {

@@ -53,6 +53,20 @@ object StatsManager {
         return totalSecs
     }
 
+    fun getMonthlyListeningSeconds(context: Context): Int {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val cal = Calendar.getInstance()
+        var totalSecs = 0
+
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        for (i in 0 until 30) {
+            val dateKey = dateFormat.format(cal.time)
+            totalSecs += prefs.getInt("usage_sec_$dateKey", 0)
+            cal.add(Calendar.DAY_OF_YEAR, -1)
+        }
+        return totalSecs
+    }
+
     fun recordSongPlay(context: Context, songId: Long) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val weekKey = getCurrentWeekKey()
