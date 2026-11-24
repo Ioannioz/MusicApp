@@ -4,17 +4,21 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.telephony.TelephonyManager
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -72,9 +76,44 @@ class AudioService : Service() {
         fun getService(): AudioService = this@AudioService
     }
 
+    private var isCallReceiverRegistered = false
+
+    private val phoneCallReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val action = intent?.action
+            if (TelephonyManager.ACTION_PHONE_STATE_CHANGED == action) {
+                val stateStr = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
+                if (stateStr == TelephonyManager.EXTRA_STATE_RINGING || stateStr == TelephonyManager.EXTRA_STATE_OFFHOOK) {
+                    player?.let { p ->
+                        if (p.isPlaying) {
+                            p.pause()
+                            notifyStateChange()
+                        }
+                    }
+                }
+            } else if (AudioManager.ACTION_AUDIO_BECOMING_NOISY == action) {
+                player?.let { p ->
+                    if (p.isPlaying) {
+                        p.pause()
+                        notifyStateChange()
+                    }
+                }
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+
+        try {
+            val filter = IntentFilter().apply {
+                addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
+                addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+            }
+            registerReceiver(phoneCallReceiver, filter)
+            isCallReceiverRegistered = true
+        } catch (_: Exception) {}
 
         mediaSession = MediaSessionCompat(this, "AudioService").apply {
             isActive = true
@@ -102,7 +141,15 @@ class AudioService : Service() {
             })
         }
 
-        player = ExoPlayer.Builder(this).build().apply {
+        val audioAttr = com.google.android.exoplayer2.audio.AudioAttributes.Builder()
+            .setUsage(com.google.android.exoplayer2.C.USAGE_MEDIA)
+            .setContentType(com.google.android.exoplayer2.C.AUDIO_CONTENT_TYPE_MUSIC)
+            .build()
+
+        player = ExoPlayer.Builder(this)
+            .setAudioAttributes(audioAttr, true)
+            .setHandleAudioBecomingNoisy(true)
+            .build().apply {
             addListener(object : Player.Listener {
                 override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                     if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT && isRepeat) {
@@ -528,6 +575,12 @@ class AudioService : Service() {
     }
 
     override fun onDestroy() {
+        if (isCallReceiverRegistered) {
+            try {
+                unregisterReceiver(phoneCallReceiver)
+            } catch (_: Exception) {}
+            isCallReceiverRegistered = false
+        }
         statsHandler.removeCallbacks(statsRunnable)
         notificationManager?.setPlayer(null)
         player?.release()

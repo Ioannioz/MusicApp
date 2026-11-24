@@ -4,7 +4,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.PorterDuff
+import android.graphics.RectF
+import androidx.core.content.ContextCompat
 import android.os.Binder
 import android.os.Build
 import android.os.Bundle
@@ -260,7 +265,7 @@ class PlayerActivity : AppCompatActivity() {
 
         val queueItemTouchHelper = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
             ItemTouchHelper.UP or ItemTouchHelper.DOWN,
-            0
+            ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
         ) {
             override fun getMovementFlags(
                 recyclerView: RecyclerView,
@@ -270,15 +275,13 @@ class PlayerActivity : AppCompatActivity() {
                 if (pos == RecyclerView.NO_POSITION) return makeMovementFlags(0, 0)
 
                 val item = queueAdapter?.items?.getOrNull(pos)
-                if (item is QueueListItem.SongItem && queueAdapter?.isPlayingSong(item.song) == true) {
+                if (item !is QueueListItem.SongItem || queueAdapter?.isPlayingSong(item.song) == true) {
                     return makeMovementFlags(0, 0)
                 }
 
-                return if (viewHolder.itemViewType == QueueAdapter.TYPE_SONG) {
-                    makeMovementFlags(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0)
-                } else {
-                    makeMovementFlags(0, 0)
-                }
+                val dragFlags = ItemTouchHelper.UP or ItemTouchHelper.DOWN
+                val swipeFlags = ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
+                return makeMovementFlags(dragFlags, swipeFlags)
             }
 
             override fun canDropOver(
@@ -318,7 +321,92 @@ class PlayerActivity : AppCompatActivity() {
                 return false
             }
 
-            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {}
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val pos = viewHolder.bindingAdapterPosition
+                val item = queueAdapter?.items?.getOrNull(pos)
+                if (item is QueueListItem.SongItem && pos != RecyclerView.NO_POSITION) {
+                    val songToRemove = item.song
+                    val srv = audioService
+                    if (srv != null) {
+                        val removedFromUserQueue = srv.userQueue.removeIf { it.id == songToRemove.id }
+                        if (!removedFromUserQueue) {
+                            (srv.songList as? MutableList)?.removeAll { it.id == songToRemove.id }
+                            (srv.shuffledList as? MutableList)?.removeAll { it.id == songToRemove.id }
+                        }
+                        ToastHelper.showToast(this@PlayerActivity, "Removed \"${songToRemove.title ?: "Song"}\" from queue")
+                        refreshEmbeddedQueueData()
+                    }
+                }
+            }
+
+            override fun onChildDraw(
+                c: Canvas,
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                dX: Float,
+                dY: Float,
+                actionState: Int,
+                isCurrentlyActive: Boolean
+            ) {
+                if (actionState == ItemTouchHelper.ACTION_STATE_SWIPE) {
+                    val itemView = viewHolder.itemView
+                    val itemWidth = itemView.width.toFloat()
+                    val threshold40 = itemWidth * 0.40f
+                    val absDX = Math.abs(dX)
+                    val isPastThreshold = absDX >= threshold40
+
+                    val theme = com.example.myapplication.model.ThemeManager.getSelectedTheme(this@PlayerActivity)
+                    val themeCardColor = Color.parseColor(theme.cardColorHex)
+                    val themeAccentColor = Color.parseColor(theme.accentColorHex)
+
+                    val preThresholdColor = androidx.core.graphics.ColorUtils.blendARGB(themeCardColor, themeAccentColor, 0.25f)
+                    val backgroundColor = if (isPastThreshold) Color.parseColor("#FF5252") else preThresholdColor
+
+                    val deleteIcon = ContextCompat.getDrawable(this@PlayerActivity, R.drawable.baseline_delete_24)
+                    val paint = Paint().apply {
+                        color = backgroundColor
+                    }
+
+                    if (dX > 0) {
+                        val background = RectF(
+                            itemView.left.toFloat(),
+                            itemView.top.toFloat(),
+                            itemView.left.toFloat() + dX,
+                            itemView.bottom.toFloat()
+                        )
+                        c.drawRect(background, paint)
+
+                        deleteIcon?.let { icon ->
+                            val margin = (itemView.height - icon.intrinsicHeight) / 2
+                            val iconTop = itemView.top + margin
+                            val iconBottom = iconTop + icon.intrinsicHeight
+                            val iconLeft = itemView.left + margin
+                            val iconRight = itemView.left + margin + icon.intrinsicWidth
+                            icon.setBounds(iconLeft, iconTop, iconRight, iconBottom)
+                            icon.draw(c)
+                        }
+                    } else if (dX < 0) {
+                        val background = RectF(
+                            itemView.right.toFloat() + dX,
+                            itemView.top.toFloat(),
+                            itemView.right.toFloat(),
+                            itemView.bottom.toFloat()
+                        )
+                        c.drawRect(background, paint)
+
+                        deleteIcon?.let { icon ->
+                            val margin = (itemView.height - icon.intrinsicHeight) / 2
+                            val iconTop = itemView.top + margin
+                            val iconBottom = iconTop + icon.intrinsicHeight
+                            val iconRight = itemView.right - margin
+                            val iconLeft = itemView.right - margin - icon.intrinsicWidth
+                            icon.setBounds(iconLeft, iconTop, iconRight, iconBottom)
+                            icon.draw(c)
+                        }
+                    }
+                }
+                super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
+            }
 
             override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
                 super.clearView(recyclerView, viewHolder)

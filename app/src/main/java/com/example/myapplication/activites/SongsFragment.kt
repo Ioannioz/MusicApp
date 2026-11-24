@@ -335,22 +335,29 @@ class SongsFragment : Fragment(), SongAdapter.OnItemClickListener, SongAdapter.O
         val adapterSongs = songAdapter?.songs ?: return
         if (position !in adapterSongs.indices) return
 
+        val fullList = mainAct.getSongList()
+        val targetSong = adapterSongs[position]
+        val actualIndex = fullList.indexOfFirst { it.id == targetSong.id }
+        val playPos = if (actualIndex != -1) actualIndex else 0
+
         val srv = mainAct.getAudioService()
         if (srv != null) {
-            val targetSong = adapterSongs[position]
-            val isSameSongAndList = srv.getCurrentSong()?.id == targetSong.id &&
-                    srv.songList.size == adapterSongs.size &&
-                    srv.songList.map { it.id } == adapterSongs.map { it.id }
+            val isSameSong = srv.getCurrentSong()?.id == targetSong.id
+            if (!isSameSong) {
+                val isFullListActive = srv.songList.size == fullList.size &&
+                        srv.songList.map { it.id } == fullList.map { it.id }
 
-            if (!isSameSongAndList) {
-                srv.userQueue.clear()
-                srv.playNewList(adapterSongs, position)
+                if (!isFullListActive) {
+                    srv.playNewList(fullList, playPos)
+                } else {
+                    srv.playSongAtIndex(playPos)
+                }
             }
         }
 
         val intent = Intent(requireContext(), PlayerActivity::class.java).apply {
-            putExtra("songList", ArrayList(adapterSongs))
-            putExtra("position", position)
+            putExtra("songList", ArrayList(fullList))
+            putExtra("position", playPos)
             putExtra("playlistName", "Device Files")
         }
         startActivity(intent)
