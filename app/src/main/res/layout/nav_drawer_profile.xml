@@ -355,7 +355,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
-                                android:text="Control your online presence and activity"
+                                android:text="Control your online presence"
                                 android:textColor="@color/light_gray"
                                 android:textSize="11sp" />
 
