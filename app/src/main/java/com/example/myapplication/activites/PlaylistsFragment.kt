@@ -123,6 +123,11 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
 
         PlaylistManager.addChangeListener(playlistChangeListener)
 
+        binding.btnProfile.setOnClickListener {
+            val mainAct = activity as? MainActivity
+            mainAct?.openProfileDrawer()
+        }
+
         binding.btnToggleLayout.setOnClickListener {
             isGridMode = !isGridMode
             prefs.edit().putBoolean("is_playlist_grid_mode", isGridMode).apply()
@@ -939,6 +944,7 @@ class PlaylistsFragment : Fragment(), PlaylistAdapter.OnPlaylistClickListener, P
         val accentColor = Color.parseColor(theme.accentColorHex)
 
         binding.root.setBackgroundColor(bgColor)
+        binding.btnProfile.setColorFilter(accentColor)
         binding.btnSearch.setColorFilter(accentColor)
         binding.btnToggleLayout.setColorFilter(accentColor)
         binding.btnCloseSearch.setColorFilter(accentColor)

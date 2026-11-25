@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "753319027179",
+    "project_id": "musicapp-855b1",
+    "storage_bucket": "musicapp-855b1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:753319027179:android:c708f75af006c7f3ab39ae",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "753319027179-i43mrhuurujaj923rrnddh57c5b2bgeh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.myapplication",
+            "certificate_hash": "181f2a1d1e88c95b80a61c2be1928af1772accf9"
+          }
+        },
+        {
+          "client_id": "753319027179-aq6838gq3fd9isuv2g5cnj8ohslnk53o.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDIB27aQQMQHhv9pe4mAvdkI9HL15rLvXo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "753319027179-aq6838gq3fd9isuv2g5cnj8ohslnk53o.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

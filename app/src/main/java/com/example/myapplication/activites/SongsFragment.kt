@@ -201,6 +201,11 @@ class SongsFragment : Fragment(), SongAdapter.OnItemClickListener, SongAdapter.O
 
         itemTouchHelper.attachToRecyclerView(binding.recyclerView)
 
+        binding.btnProfile?.setOnClickListener {
+            val mainAct = activity as? MainActivity
+            mainAct?.openProfileDrawer()
+        }
+
         binding.btnSortSongs.setOnClickListener {
             showSortOptionsBottomSheet()
         }
@@ -384,6 +389,7 @@ class SongsFragment : Fragment(), SongAdapter.OnItemClickListener, SongAdapter.O
         val accentColor = Color.parseColor(theme.accentColorHex)
 
         binding.root.setBackgroundColor(bgColor)
+        binding.btnProfile.setColorFilter(accentColor)
         binding.btnSearch.setColorFilter(accentColor)
         binding.btnToggleLayout.setColorFilter(accentColor)
         binding.btnCloseSearch.setColorFilter(accentColor)
