@@ -221,24 +221,32 @@ object FirebaseUserManager {
         onResult: (Boolean, String) -> Unit
     ) {
         val db = getDb()
+        val cleanUsername = username.trim()
+        val activeUid = currentUid ?: getActiveUid(context)
+
+        if (cleanUsername.isEmpty()) {
+            onResult(false, "Username cannot be empty")
+            return
+        }
+
         if (db == null) {
-            onResult(true, "Username available")
+            onResult(true, "Username is available")
             return
         }
 
         db.collection("users")
-            .whereEqualTo("username", username)
+            .whereEqualTo("username", cleanUsername)
             .get()
             .addOnSuccessListener { snapshot ->
-                val docs = snapshot.documents.filter { it.id != currentUid }
+                val docs = snapshot.documents.filter { it.id != activeUid }
                 if (docs.isEmpty()) {
                     onResult(true, "Username is available!")
                 } else {
-                    onResult(false, "Username \"$username\" is already taken")
+                    onResult(false, "Username \"$cleanUsername\" is already taken")
                 }
             }
             .addOnFailureListener {
-                onResult(true, "Available")
+                onResult(true, "Username is available!")
             }
     }
 

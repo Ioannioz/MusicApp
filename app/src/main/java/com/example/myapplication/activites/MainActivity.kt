@@ -587,9 +587,8 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         btnSave.setOnClickListener {
             val newUsername = inputUsername.text.toString().trim()
             if (newUsername.isNotEmpty()) {
-                val currentProf = com.example.myapplication.model.FirebaseUserManager.getLocalProfile(this)
-                val currentUid = currentProf?.uid
-                com.example.myapplication.model.FirebaseUserManager.checkUsernameAvailability(this, newUsername, currentUid) { available, msg ->
+                val activeUid = com.example.myapplication.model.FirebaseUserManager.getActiveUid(this)
+                com.example.myapplication.model.FirebaseUserManager.checkUsernameAvailability(this, newUsername, activeUid) { available, msg ->
                     if (available) {
                         dialog.dismiss()
                         saveProfileChanges(newUsername, tempSelectedProfileAvatarUri)
