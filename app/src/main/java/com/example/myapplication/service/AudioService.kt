@@ -157,6 +157,7 @@ class AudioService : Service() {
                         repeatMode = Player.REPEAT_MODE_OFF
                     }
                     notifyStateChange()
+                    notifyTrackChangedToFirestore()
                 }
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
@@ -164,10 +165,12 @@ class AudioService : Service() {
                         playNext()
                     }
                     notifyStateChange()
+                    notifyTrackChangedToFirestore()
                 }
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     notifyStateChange()
+                    notifyTrackChangedToFirestore()
                 }
             })
         }
@@ -260,6 +263,28 @@ class AudioService : Service() {
         notificationManager?.invalidate()
         for (listener in stateListeners) {
             listener.invoke()
+        }
+    }
+
+    fun notifyTrackChangedToFirestore() {
+        val song = getCurrentSong()
+        val isPlaying = player?.isPlaying == true
+        val broadcastEnabled = getSharedPreferences("user_profile_prefs", Context.MODE_PRIVATE)
+            .getBoolean("broadcast_status_enabled", true)
+
+        if (broadcastEnabled && isPlaying && song != null) {
+            val artTarget = song.getAlbumArtTarget(this)
+            var artUrl = ""
+            if (artTarget is File && artTarget.exists()) {
+                val uri = Uri.fromFile(artTarget)
+                artUrl = com.example.myapplication.util.ImageUtils.uriToBase64(this, uri, targetSize = 140) ?: ""
+            } else if (artTarget is Uri) {
+                artUrl = com.example.myapplication.util.ImageUtils.uriToBase64(this, artTarget, targetSize = 140) ?: ""
+            }
+            com.example.myapplication.model.FirebaseUserManager.updateNowPlaying(this, song.title, song.artist, artUrl)
+        } else if (!isPlaying) {
+            val currentStatus = if (broadcastEnabled) "Online" else "Offline"
+            com.example.myapplication.model.FirebaseUserManager.updatePresence(this, broadcastEnabled, currentStatus)
         }
     }
 

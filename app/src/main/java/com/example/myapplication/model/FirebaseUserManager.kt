@@ -182,35 +182,50 @@ object FirebaseUserManager {
         val userEmail = if (email.isNotEmpty()) email else "googleuser@gmail.com"
         val fallbackUsername = if (displayName.isNotEmpty()) displayName else userEmail.substringBefore("@")
 
-        val uid = getCurrentUser()?.uid ?: ("google_" + System.currentTimeMillis())
+        if (idToken.isNotEmpty() && auth != null) {
+            val credential = com.google.firebase.auth.GoogleAuthProvider.getCredential(idToken, null)
+            auth.signInWithCredential(credential)
+                .addOnSuccessListener { authResult ->
+                    val firebaseUser = authResult.user
+                    val uid = firebaseUser?.uid ?: ("google_" + System.currentTimeMillis())
 
-        if (db != null) {
-            db.collection("users").document(uid).get()
-                .addOnSuccessListener { doc ->
-                    val finalUsername = if (doc.exists() && !doc.getString("username").isNullOrEmpty()) {
-                        doc.getString("username")!!
+                    if (db != null) {
+                        db.collection("users").document(uid).get()
+                            .addOnSuccessListener { doc ->
+                                val finalUsername = if (doc.exists() && !doc.getString("username").isNullOrEmpty()) {
+                                    doc.getString("username")!!
+                                } else {
+                                    fallbackUsername
+                                }
+
+                                val profile = UserProfile(
+                                    uid = uid,
+                                    username = finalUsername,
+                                    email = firebaseUser?.email ?: userEmail,
+                                    status = "Online",
+                                    lastActiveTimestamp = System.currentTimeMillis()
+                                )
+                                db.collection("users").document(uid).set(profile, SetOptions.merge())
+                                saveSessionPreferences(context, uid, firebaseUser?.email ?: userEmail, finalUsername)
+                                updatePresence(context, true)
+                                onResult(true, "Signed in with Google as $finalUsername!")
+                            }
+                            .addOnFailureListener {
+                                saveSessionPreferences(context, uid, firebaseUser?.email ?: userEmail, fallbackUsername)
+                                updatePresence(context, true)
+                                onResult(true, "Signed in as $fallbackUsername!")
+                            }
                     } else {
-                        fallbackUsername
+                        saveSessionPreferences(context, uid, firebaseUser?.email ?: userEmail, fallbackUsername)
+                        updatePresence(context, true)
+                        onResult(true, "Signed in as $fallbackUsername!")
                     }
-
-                    val profile = UserProfile(
-                        uid = uid,
-                        username = finalUsername,
-                        email = userEmail,
-                        status = "Online",
-                        lastActiveTimestamp = System.currentTimeMillis()
-                    )
-                    db.collection("users").document(uid).set(profile, SetOptions.merge())
-                    saveSessionPreferences(context, uid, userEmail, finalUsername)
-                    onResult(true, "Signed in as $finalUsername!")
                 }
-                .addOnFailureListener {
-                    saveSessionPreferences(context, uid, userEmail, fallbackUsername)
-                    onResult(true, "Signed in as $fallbackUsername!")
+                .addOnFailureListener { e ->
+                    onResult(false, e.localizedMessage ?: "Google Sign-In failed")
                 }
         } else {
-            saveSessionPreferences(context, uid, userEmail, fallbackUsername)
-            onResult(true, "Signed in as $fallbackUsername!")
+            onResult(false, "Invalid Google ID token")
         }
     }
 
@@ -715,9 +730,12 @@ object FirebaseUserManager {
                             .addSnapshotListener { userSnap, _ ->
                                 if (userSnap != null) {
                                     val currentNow = System.currentTimeMillis()
-                                    val rawProfiles = userSnap.documents.mapNotNull { doc ->
+                                    val profileMap = userSnap.documents.mapNotNull { doc ->
                                         doc.toObject(UserProfile::class.java)?.copy(uid = doc.id)
-                                    }
+                                    }.associateBy { it.uid }
+
+                                    val rawProfiles = friendUids.mapNotNull { uid -> profileMap[uid] }
+
                                     val evaluatedProfiles = rawProfiles.map { prof ->
                                         val isStale = (currentNow - prof.lastActiveTimestamp) > 25_000
                                         val isOfflineStatus = prof.status.equals("Offline", ignoreCase = true) || prof.status.contains("Offline", ignoreCase = true)

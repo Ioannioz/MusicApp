@@ -60,6 +60,9 @@ import java.util.Collections
 import java.util.Locale
 
 class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
+
+    private var friendsListenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
+    private var pendingRequestsListenerRegistration: com.google.firebase.firestore.ListenerRegistration? = null
     private lateinit var binding: ActivityMainBinding
     private lateinit var pagerAdapter: MainPagerAdapter
     private var songList: List<Song> = mutableListOf()
@@ -154,7 +157,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
     private fun getWebClientId(): String {
         val resId = resources.getIdentifier("default_web_client_id", "string", packageName)
-        return if (resId != 0) getString(resId) else "753319027179-webclient.apps.googleusercontent.com"
+        return if (resId != 0) getString(resId) else "753319027179-aq6838gq3fd9isuv2g5cnj8ohslnk53o.apps.googleusercontent.com"
     }
 
     private val googleSignInLauncher =
@@ -692,6 +695,10 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
         btnConfirm.setOnClickListener {
             dialog.dismiss()
+            friendsListenerRegistration?.remove()
+            friendsListenerRegistration = null
+            pendingRequestsListenerRegistration?.remove()
+            pendingRequestsListenerRegistration = null
             com.example.myapplication.model.FirebaseUserManager.signOut(this)
             ToastHelper.showToast(this, "Signed out")
             refreshDrawerAuthState()
@@ -715,6 +722,10 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                     runOnUiThread {
                         if (!exists) {
                             ToastHelper.showToast(this, "Account not found in database. Please sign in again.")
+                            friendsListenerRegistration?.remove()
+                            friendsListenerRegistration = null
+                            pendingRequestsListenerRegistration?.remove()
+                            pendingRequestsListenerRegistration = null
                             drawer.layoutLoggedOut.visibility = View.VISIBLE
                             drawer.layoutLoggedIn.visibility = View.GONE
                             return@runOnUiThread
@@ -805,66 +816,74 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                             drawer.imgDrawerNowPlayingArt.setImageResource(R.drawable.baseline_music_note_24)
                         }
 
-                        com.example.myapplication.model.FirebaseUserManager.listenToPendingRequests(this@MainActivity) { requests ->
-                            runOnUiThread {
-                                if (requests.isNotEmpty()) {
-                                    drawer.layoutPendingRequests.visibility = View.VISIBLE
-                                    drawer.containerPendingRequests.removeAllViews()
-                                    requests.forEach { req ->
-                                        val reqView = layoutInflater.inflate(R.layout.item_pending_request, null)
-                                        val reqCardView = reqView.findViewById<androidx.cardview.widget.CardView>(R.id.cardPendingRequest)
-                                        val currentTheme = com.example.myapplication.model.ThemeManager.getSelectedTheme(this@MainActivity)
-                                        reqCardView?.setCardBackgroundColor(android.graphics.Color.parseColor(currentTheme.cardColorHex))
+                        if (pendingRequestsListenerRegistration == null) {
+                            pendingRequestsListenerRegistration = com.example.myapplication.model.FirebaseUserManager.listenToPendingRequests(this@MainActivity) { requests ->
+                                runOnUiThread {
+                                    if (requests.isNotEmpty()) {
+                                        drawer.layoutPendingRequests.visibility = View.VISIBLE
+                                        drawer.containerPendingRequests.removeAllViews()
+                                        requests.forEach { req ->
+                                            val reqView = layoutInflater.inflate(R.layout.item_pending_request, null)
+                                            val reqCardView = reqView.findViewById<androidx.cardview.widget.CardView>(R.id.cardPendingRequest)
+                                            val currentTheme = com.example.myapplication.model.ThemeManager.getSelectedTheme(this@MainActivity)
+                                            reqCardView?.setCardBackgroundColor(android.graphics.Color.parseColor(currentTheme.cardColorHex))
 
-                                        val reqNameText = reqView.findViewById<TextView>(R.id.textReqName)
-                                        reqNameText.text = "${req.senderUsername} wants to be friends"
-                                        reqNameText.setTextColor(android.graphics.Color.WHITE)
-                                        val btnAccept = reqView.findViewById<Button>(R.id.btnReqAccept)
-                                        val btnDecline = reqView.findViewById<Button>(R.id.btnReqDecline)
-                                        com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnAccept, this@MainActivity)
-                                        com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnDecline, this@MainActivity)
+                                            val reqNameText = reqView.findViewById<TextView>(R.id.textReqName)
+                                            reqNameText.text = "${req.senderUsername} wants to be friends"
+                                            reqNameText.setTextColor(android.graphics.Color.WHITE)
+                                            val btnAccept = reqView.findViewById<Button>(R.id.btnReqAccept)
+                                            val btnDecline = reqView.findViewById<Button>(R.id.btnReqDecline)
+                                            com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnAccept, this@MainActivity)
+                                            com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnDecline, this@MainActivity)
 
-                                        btnAccept.setOnClickListener {
-                                            com.example.myapplication.model.FirebaseUserManager.acceptFriendRequest(this@MainActivity, req) { ok ->
-                                                if (ok) ToastHelper.showToast(this@MainActivity, "Accepted friend request!")
+                                            btnAccept.setOnClickListener {
+                                                com.example.myapplication.model.FirebaseUserManager.acceptFriendRequest(this@MainActivity, req) { ok ->
+                                                    if (ok) ToastHelper.showToast(this@MainActivity, "Accepted friend request!")
+                                                }
                                             }
+                                            btnDecline.setOnClickListener {
+                                                com.example.myapplication.model.FirebaseUserManager.declineFriendRequest(req.requestId) { _ -> }
+                                            }
+                                            drawer.containerPendingRequests.addView(reqView)
                                         }
-                                        btnDecline.setOnClickListener {
-                                            com.example.myapplication.model.FirebaseUserManager.declineFriendRequest(req.requestId) { _ -> }
-                                        }
-                                        drawer.containerPendingRequests.addView(reqView)
+                                    } else {
+                                        drawer.layoutPendingRequests.visibility = View.GONE
                                     }
-                                } else {
-                                    drawer.layoutPendingRequests.visibility = View.GONE
                                 }
                             }
                         }
 
-                        drawer.recyclerViewFriends.layoutManager = LinearLayoutManager(this@MainActivity)
-                        com.example.myapplication.model.FirebaseUserManager.listenToFriendsList(this@MainActivity) { friends ->
-                            runOnUiThread {
-                                if (friends.isNotEmpty()) {
-                                    drawer.textFriendsEmpty.visibility = View.GONE
-                                    drawer.recyclerViewFriends.visibility = View.VISIBLE
+                        if (friendsListenerRegistration == null) {
+                            drawer.recyclerViewFriends.layoutManager = LinearLayoutManager(this@MainActivity)
+                            friendsListenerRegistration = com.example.myapplication.model.FirebaseUserManager.listenToFriendsList(this@MainActivity) { friends ->
+                                runOnUiThread {
+                                    if (friends.isNotEmpty()) {
+                                        drawer.textFriendsEmpty.visibility = View.GONE
+                                        drawer.recyclerViewFriends.visibility = View.VISIBLE
 
-                                    val currentAdapter = drawer.recyclerViewFriends.adapter as? com.example.myapplication.adapter.FriendAdapter
-                                    if (currentAdapter != null) {
-                                        currentAdapter.updateFriends(friends)
-                                    } else {
-                                        drawer.recyclerViewFriends.adapter = com.example.myapplication.adapter.FriendAdapter(friends) { friendToRemove ->
-                                            showRemoveFriendConfirmationDialog(friendToRemove)
+                                        val currentAdapter = drawer.recyclerViewFriends.adapter as? com.example.myapplication.adapter.FriendAdapter
+                                        if (currentAdapter != null) {
+                                            currentAdapter.updateFriends(friends)
+                                        } else {
+                                            drawer.recyclerViewFriends.adapter = com.example.myapplication.adapter.FriendAdapter(friends) { friendToRemove ->
+                                                showRemoveFriendConfirmationDialog(friendToRemove)
+                                            }
                                         }
+                                    } else {
+                                        drawer.textFriendsEmpty.visibility = View.VISIBLE
+                                        drawer.recyclerViewFriends.visibility = View.GONE
+                                        drawer.recyclerViewFriends.adapter = null
                                     }
-                                } else {
-                                    drawer.textFriendsEmpty.visibility = View.VISIBLE
-                                    drawer.recyclerViewFriends.visibility = View.GONE
-                                    drawer.recyclerViewFriends.adapter = null
                                 }
                             }
                         }
                     }
                 }
             } else {
+                friendsListenerRegistration?.remove()
+                friendsListenerRegistration = null
+                pendingRequestsListenerRegistration?.remove()
+                pendingRequestsListenerRegistration = null
                 drawer.layoutLoggedOut.visibility = View.VISIBLE
                 drawer.layoutLoggedIn.visibility = View.GONE
             }
