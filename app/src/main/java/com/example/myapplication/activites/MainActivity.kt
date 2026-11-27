@@ -419,6 +419,11 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                 return@setOnClickListener
             }
 
+            if (pass.length < 8) {
+                ToastHelper.showToast(this, "Password must be at least 8 characters")
+                return@setOnClickListener
+            }
+
             com.example.myapplication.model.FirebaseUserManager.signUpWithEmail(this, email, user, pass) { success, msg ->
                 ToastHelper.showToast(this, msg)
                 if (success) {
@@ -442,21 +447,55 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
                 val gso = gsoBuilder.build()
                 val googleClient = com.google.android.gms.auth.api.signin.GoogleSignIn.getClient(this, gso)
-                googleSignInLauncher.launch(googleClient.signInIntent)
+
+                // Sign out Google Client first so Google Account Chooser is shown every time!
+                googleClient.signOut().addOnCompleteListener {
+                    googleSignInLauncher.launch(googleClient.signInIntent)
+                }
             } catch (e: Exception) {
                 ToastHelper.showToast(this, "Google Sign-In error: ${e.message}")
             }
         }
 
         drawer.btnSignOut.setOnClickListener {
-            com.example.myapplication.model.FirebaseUserManager.signOut(this)
-            ToastHelper.showToast(this, "Signed out")
-            refreshDrawerAuthState()
+            showSignOutConfirmationDialog()
+        }
+
+        drawer.inputSearchFriend.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                drawer.navDrawerScrollView.postDelayed({
+                    drawer.navDrawerScrollView.smoothScrollTo(0, drawer.inputSearchFriend.bottom + 300)
+                }, 200)
+            }
+        }
+
+        drawer.inputSearchFriend.setOnClickListener {
+            drawer.navDrawerScrollView.postDelayed({
+                drawer.navDrawerScrollView.smoothScrollTo(0, drawer.inputSearchFriend.bottom + 300)
+            }, 200)
+        }
+
+        drawer.inputSearchFriend.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE ||
+                actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEND ||
+                actionId == android.view.inputmethod.EditorInfo.IME_NULL
+            ) {
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(drawer.inputSearchFriend.windowToken, 0)
+                drawer.inputSearchFriend.clearFocus()
+                true
+            } else {
+                false
+            }
         }
 
         drawer.btnAddFriend.setOnClickListener {
             val username = drawer.inputSearchFriend.text.toString().trim()
             if (username.isNotEmpty()) {
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(drawer.inputSearchFriend.windowToken, 0)
+                drawer.inputSearchFriend.clearFocus()
+
                 com.example.myapplication.model.FirebaseUserManager.sendFriendRequest(this, username) { success, msg ->
                     ToastHelper.showToast(this, msg)
                     if (success) {
@@ -469,15 +508,9 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
             }
         }
 
-        drawer.btnShareProfileLink.setOnClickListener {
-            val userProfile = com.example.myapplication.model.FirebaseUserManager.getLocalProfile(this)
-            val username = userProfile?.username ?: "User"
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, "Check out my MusicApp profile: https://musicapp.me/@$username")
-            }
-            startActivity(Intent.createChooser(shareIntent, "Share Profile Link"))
-        }
+        val initPrefs = getSharedPreferences("user_profile_prefs", Context.MODE_PRIVATE)
+        drawer.switchBroadcastStatus.isChecked = initPrefs.getBoolean("broadcast_status_enabled", true)
+        drawer.switchAllowFriendRequests.isChecked = initPrefs.getBoolean("allow_friend_requests", true)
 
         drawer.switchBroadcastStatus.setOnCheckedChangeListener { _, isChecked ->
             getSharedPreferences("user_profile_prefs", Context.MODE_PRIVATE)
@@ -490,6 +523,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         drawer.switchAllowFriendRequests.setOnCheckedChangeListener { _, isChecked ->
             getSharedPreferences("user_profile_prefs", Context.MODE_PRIVATE)
                 .edit().putBoolean("allow_friend_requests", isChecked).apply()
+            com.example.myapplication.model.FirebaseUserManager.updateFriendRequestPreference(this, isChecked)
             ToastHelper.showToast(this, if (isChecked) "Friend requests allowed" else "Friend requests disabled")
         }
 
@@ -512,16 +546,36 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         val currentProf = com.example.myapplication.model.FirebaseUserManager.getLocalProfile(this)
         inputUsername.setText(currentProf?.username ?: "User")
 
-        val avatarFile = File(filesDir, "user_avatar.jpg")
+        val activeUid = com.example.myapplication.model.FirebaseUserManager.getActiveUid(this) ?: "user"
+        val avatarFile = File(filesDir, "avatar_${activeUid}.jpg")
+
+        avatarPreview.imageTintList = null
+        avatarPreview.clearColorFilter()
+
         if (avatarFile.exists()) {
-            avatarPreview.imageTintList = null
-            avatarPreview.clearColorFilter()
             Glide.with(this)
                 .load(avatarFile)
                 .signature(com.bumptech.glide.signature.ObjectKey(avatarFile.lastModified()))
                 .centerCrop()
                 .placeholder(R.drawable.baseline_account_circle_24)
                 .into(avatarPreview)
+        } else {
+            avatarPreview.setImageResource(R.drawable.baseline_account_circle_24)
+            com.example.myapplication.model.FirebaseUserManager.fetchCurrentProfile(this) { profile ->
+                runOnUiThread {
+                    val cloudAvatar = profile?.avatarUrl
+                    if (!cloudAvatar.isNullOrEmpty()) {
+                        val bitmap = com.example.myapplication.util.ImageUtils.decodeBase64ToBitmap(cloudAvatar)
+                        if (bitmap != null) {
+                            Glide.with(this@MainActivity)
+                                .load(bitmap)
+                                .centerCrop()
+                                .placeholder(R.drawable.baseline_account_circle_24)
+                                .into(avatarPreview)
+                        }
+                    }
+                }
+            }
         }
 
         btnChangeAvatar.setOnClickListener {
@@ -559,11 +613,12 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
     }
 
     private fun saveProfileChanges(newUsername: String, avatarUri: Uri?) {
+        val activeUid = com.example.myapplication.model.FirebaseUserManager.getActiveUid(this) ?: "user"
         com.example.myapplication.model.FirebaseUserManager.updateUsername(this, newUsername)
 
         if (avatarUri != null) {
             try {
-                val avatarFile = File(filesDir, "user_avatar.jpg")
+                val avatarFile = File(filesDir, "avatar_${activeUid}.jpg")
                 contentResolver.openInputStream(avatarUri)?.use { input ->
                     avatarFile.outputStream().use { output -> input.copyTo(output) }
                 }
@@ -580,6 +635,75 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
         refreshDrawerAuthState()
         ToastHelper.showToast(this, "Profile updated!")
+    }
+
+    private fun showRemoveFriendConfirmationDialog(friend: com.example.myapplication.model.UserProfile) {
+        val dialog = AlertDialog.Builder(this).create()
+        val view = layoutInflater.inflate(R.layout.dialog_input_text, null)
+
+        val titleText = view.findViewById<TextView>(R.id.dialogInputTitle)
+        val subMsgText = view.findViewById<TextView>(R.id.dialogInputSubMessage)
+        val inputField = view.findViewById<EditText>(R.id.dialogInputField)
+        val btnCancel = view.findViewById<Button>(R.id.btnInputCancel)
+        val btnConfirm = view.findViewById<Button>(R.id.btnInputConfirm)
+
+        titleText.text = "Remove Friend"
+        subMsgText.visibility = View.VISIBLE
+        subMsgText.text = "Are you sure you want to remove ${friend.username} from your friends list?"
+        inputField.visibility = View.GONE
+        btnConfirm.text = "Remove"
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnConfirm.setOnClickListener {
+            dialog.dismiss()
+            com.example.myapplication.model.FirebaseUserManager.removeFriend(this, friend.uid, friend.username) { ok ->
+                if (ok) {
+                    ToastHelper.showToast(this, "Removed ${friend.username} from friends")
+                    refreshDrawerAuthState()
+                }
+            }
+        }
+
+        dialog.setView(view)
+        com.example.myapplication.util.DialogThemeHelper.styleDialogView(view, this)
+        com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnConfirm, this)
+        com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, this)
+        com.example.myapplication.util.DialogThemeHelper.removeDialogWindowBorders(dialog)
+        dialog.show()
+    }
+
+    private fun showSignOutConfirmationDialog() {
+        val dialog = AlertDialog.Builder(this).create()
+        val view = layoutInflater.inflate(R.layout.dialog_input_text, null)
+
+        val titleText = view.findViewById<TextView>(R.id.dialogInputTitle)
+        val subMsgText = view.findViewById<TextView>(R.id.dialogInputSubMessage)
+        val inputField = view.findViewById<EditText>(R.id.dialogInputField)
+        val btnCancel = view.findViewById<Button>(R.id.btnInputCancel)
+        val btnConfirm = view.findViewById<Button>(R.id.btnInputConfirm)
+
+        titleText.text = "Sign Out"
+        subMsgText.visibility = View.VISIBLE
+        subMsgText.text = "Are you sure you want to sign out of your account?"
+        inputField.visibility = View.GONE
+        btnConfirm.text = "Sign Out"
+
+        btnCancel.setOnClickListener { dialog.dismiss() }
+
+        btnConfirm.setOnClickListener {
+            dialog.dismiss()
+            com.example.myapplication.model.FirebaseUserManager.signOut(this)
+            ToastHelper.showToast(this, "Signed out")
+            refreshDrawerAuthState()
+        }
+
+        dialog.setView(view)
+        com.example.myapplication.util.DialogThemeHelper.styleDialogView(view, this)
+        com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnConfirm, this)
+        com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnCancel, this)
+        com.example.myapplication.util.DialogThemeHelper.removeDialogWindowBorders(dialog)
+        dialog.show()
     }
 
     fun refreshDrawerAuthState() {
@@ -599,9 +723,21 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
 
                         drawer.layoutLoggedOut.visibility = View.GONE
                         drawer.layoutLoggedIn.visibility = View.VISIBLE
+
+                        val syncPrefs = getSharedPreferences("user_profile_prefs", Context.MODE_PRIVATE)
+                        val broadcastOn = syncPrefs.getBoolean("broadcast_status_enabled", true)
+                        val requestsOn = syncPrefs.getBoolean("allow_friend_requests", true)
+                        if (drawer.switchBroadcastStatus.isChecked != broadcastOn) {
+                            drawer.switchBroadcastStatus.isChecked = broadcastOn
+                        }
+                        if (drawer.switchAllowFriendRequests.isChecked != requestsOn) {
+                            drawer.switchAllowFriendRequests.isChecked = requestsOn
+                        }
+
                         updateUserOnlineStatus()
 
-                        val avatarFile = File(filesDir, "user_avatar.jpg")
+                        val activeUid = com.example.myapplication.model.FirebaseUserManager.getActiveUid(this@MainActivity) ?: "user"
+                        val avatarFile = File(filesDir, "avatar_${activeUid}.jpg")
                         if (avatarFile.exists()) {
                             drawer.imgProfileAvatar.imageTintList = null
                             drawer.imgProfileAvatar.clearColorFilter()
@@ -618,9 +754,40 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                         com.example.myapplication.model.FirebaseUserManager.fetchCurrentProfile(this@MainActivity) { profile ->
                             runOnUiThread {
                                 val username = profile?.username ?: com.example.myapplication.model.FirebaseUserManager.getLocalProfile(this@MainActivity)?.username ?: "User"
-                                val status = profile?.status ?: com.example.myapplication.model.FirebaseUserManager.getLocalProfile(this@MainActivity)?.status ?: "Online"
                                 drawer.textProfileUsername.text = username
-                                drawer.textProfileStatus.text = status
+                                drawer.textProfileStatus.text = if (drawer.switchBroadcastStatus.isChecked) "Online" else "Offline"
+                                drawer.textProfileStatus.setTextColor(
+                                    if (drawer.switchBroadcastStatus.isChecked) android.graphics.Color.parseColor("#1DB954") else android.graphics.Color.parseColor("#FF5252")
+                                )
+
+                                val cloudAvatar = profile?.avatarUrl
+                                if (!cloudAvatar.isNullOrEmpty()) {
+                                    drawer.imgProfileAvatar.imageTintList = null
+                                    drawer.imgProfileAvatar.clearColorFilter()
+                                    val bitmap = com.example.myapplication.util.ImageUtils.decodeBase64ToBitmap(cloudAvatar)
+                                    if (bitmap != null) {
+                                        Glide.with(this@MainActivity)
+                                            .load(bitmap)
+                                            .centerCrop()
+                                            .placeholder(R.drawable.baseline_account_circle_24)
+                                            .into(drawer.imgProfileAvatar)
+
+                                        Thread {
+                                            try {
+                                                val fileOut = avatarFile.outputStream()
+                                                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, fileOut)
+                                                fileOut.close()
+                                            } catch (_: Exception) {}
+                                        }.start()
+                                    }
+                                } else if (avatarFile.exists()) {
+                                    // Sync existing local avatar to Cloud Firestore for friends to see
+                                    val uri = Uri.fromFile(avatarFile)
+                                    val base64 = com.example.myapplication.util.ImageUtils.uriToBase64(this@MainActivity, uri, targetSize = 140)
+                                    if (!base64.isNullOrEmpty()) {
+                                        com.example.myapplication.model.FirebaseUserManager.updateUserAvatarUrl(this@MainActivity, base64)
+                                    }
+                                }
                             }
                         }
 
@@ -633,7 +800,6 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                                 .centerCrop()
                                 .placeholder(R.drawable.baseline_music_note_24)
                                 .into(drawer.imgDrawerNowPlayingArt)
-                            com.example.myapplication.model.FirebaseUserManager.updateNowPlaying(this@MainActivity, currentSong.title, currentSong.artist)
                         } else {
                             drawer.textDrawerNowPlayingTitle.text = "Not Playing"
                             drawer.textDrawerNowPlayingArtist.text = "Select a song"
@@ -647,14 +813,20 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                                     drawer.containerPendingRequests.removeAllViews()
                                     requests.forEach { req ->
                                         val reqView = layoutInflater.inflate(R.layout.item_pending_request, null)
-                                        reqView.findViewById<TextView>(R.id.textReqName).text = "${req.senderUsername} wants to be friends"
+                                        val reqCardView = reqView.findViewById<androidx.cardview.widget.CardView>(R.id.cardPendingRequest)
+                                        val currentTheme = com.example.myapplication.model.ThemeManager.getSelectedTheme(this@MainActivity)
+                                        reqCardView?.setCardBackgroundColor(android.graphics.Color.parseColor(currentTheme.cardColorHex))
+
+                                        val reqNameText = reqView.findViewById<TextView>(R.id.textReqName)
+                                        reqNameText.text = "${req.senderUsername} wants to be friends"
+                                        reqNameText.setTextColor(android.graphics.Color.WHITE)
                                         val btnAccept = reqView.findViewById<Button>(R.id.btnReqAccept)
                                         val btnDecline = reqView.findViewById<Button>(R.id.btnReqDecline)
                                         com.example.myapplication.util.DialogThemeHelper.stylePrimaryButton(btnAccept, this@MainActivity)
                                         com.example.myapplication.util.DialogThemeHelper.styleSecondaryButton(btnDecline, this@MainActivity)
 
                                         btnAccept.setOnClickListener {
-                                            com.example.myapplication.model.FirebaseUserManager.acceptFriendRequest(req) { ok ->
+                                            com.example.myapplication.model.FirebaseUserManager.acceptFriendRequest(this@MainActivity, req) { ok ->
                                                 if (ok) ToastHelper.showToast(this@MainActivity, "Accepted friend request!")
                                             }
                                         }
@@ -675,17 +847,19 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
                                 if (friends.isNotEmpty()) {
                                     drawer.textFriendsEmpty.visibility = View.GONE
                                     drawer.recyclerViewFriends.visibility = View.VISIBLE
-                                    drawer.recyclerViewFriends.adapter = com.example.myapplication.adapter.FriendAdapter(friends) { friendToRemove ->
-                                        com.example.myapplication.model.FirebaseUserManager.removeFriend(this@MainActivity, friendToRemove.uid, friendToRemove.username) { ok ->
-                                            if (ok) {
-                                                ToastHelper.showToast(this@MainActivity, "Removed ${friendToRemove.username} from friends")
-                                                refreshDrawerAuthState()
-                                            }
+
+                                    val currentAdapter = drawer.recyclerViewFriends.adapter as? com.example.myapplication.adapter.FriendAdapter
+                                    if (currentAdapter != null) {
+                                        currentAdapter.updateFriends(friends)
+                                    } else {
+                                        drawer.recyclerViewFriends.adapter = com.example.myapplication.adapter.FriendAdapter(friends) { friendToRemove ->
+                                            showRemoveFriendConfirmationDialog(friendToRemove)
                                         }
                                     }
                                 } else {
                                     drawer.textFriendsEmpty.visibility = View.VISIBLE
                                     drawer.recyclerViewFriends.visibility = View.GONE
+                                    drawer.recyclerViewFriends.adapter = null
                                 }
                             }
                         }
@@ -758,6 +932,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         drawer.cardDrawerNowPlaying.setCardBackgroundColor(cardColor)
         drawer.cardAccountSettings.setCardBackgroundColor(cardColor)
         drawer.btnCloseDrawer.setColorFilter(accentColor)
+        drawer.textPendingRequestsHeader.setTextColor(accentColor)
 
         val switchThumbStateList = android.content.res.ColorStateList(
             arrayOf(
@@ -863,7 +1038,7 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
         drawer.textProfileStatus.text = "Online"
         drawer.textProfileStatus.setTextColor(android.graphics.Color.parseColor("#1DB954"))
 
-        if (currentSong != null && isPlaying) {
+        if (currentSong != null) {
             val artTarget = currentSong.getAlbumArtTarget(this)
             var artUrl = ""
             if (artTarget is File && artTarget.exists()) {
@@ -901,10 +1076,8 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
     override fun onDestroy() {
         super.onDestroy()
         presenceHandler.removeCallbacks(presenceRunnable)
-        val isPlaying = audioService?.player?.isPlaying == true
-        if (!isPlaying) {
-            com.example.myapplication.model.FirebaseUserManager.updatePresence(this, isOnline = false, customStatus = "Offline")
-        }
+        com.example.myapplication.model.FirebaseUserManager.updatePresence(this, isOnline = false, customStatus = "Offline")
+        com.example.myapplication.model.FirebaseUserManager.updateNowPlaying(this, null, null, null)
         if (networkCallback != null) {
             try {
                 val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
@@ -934,9 +1107,9 @@ class MainActivity : AppCompatActivity(), SongAdapter.OnItemClickListener {
     override fun onStop() {
         super.onStop()
         presenceHandler.removeCallbacks(presenceRunnable)
-        val isPlaying = audioService?.player?.isPlaying == true
-        if (!isPlaying) {
+        if (isFinishing) {
             com.example.myapplication.model.FirebaseUserManager.updatePresence(this, isOnline = false, customStatus = "Offline")
+            com.example.myapplication.model.FirebaseUserManager.updateNowPlaying(this, null, null, null)
         }
         activeQueueToast?.cancel()
         handle.removeCallbacks(updateProgressRunnable)

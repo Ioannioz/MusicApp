@@ -90,6 +90,11 @@ object FirebaseUserManager {
         val db = getDb()
         val finalUsername = username.ifEmpty { email.substringBefore("@") }
 
+        if (password.length < 8) {
+            onResult(false, "Password must be at least 8 characters")
+            return
+        }
+
         if (auth == null || db == null) {
             onResult(false, "Firebase not initialized. Check google-services.json")
             return
@@ -175,50 +180,37 @@ object FirebaseUserManager {
         val auth = getAuth()
         val db = getDb()
         val userEmail = if (email.isNotEmpty()) email else "googleuser@gmail.com"
-        val username = if (displayName.isNotEmpty()) displayName else userEmail.substringBefore("@")
+        val fallbackUsername = if (displayName.isNotEmpty()) displayName else userEmail.substringBefore("@")
 
-        if (idToken.isNotEmpty() && auth != null) {
-            val credential = GoogleAuthProvider.getCredential(idToken, null)
-            auth.signInWithCredential(credential)
-                .addOnSuccessListener { authResult ->
-                    val firebaseUser = authResult.user
-                    val uid = firebaseUser?.uid ?: ("google_" + System.currentTimeMillis())
+        val uid = getCurrentUser()?.uid ?: ("google_" + System.currentTimeMillis())
+
+        if (db != null) {
+            db.collection("users").document(uid).get()
+                .addOnSuccessListener { doc ->
+                    val finalUsername = if (doc.exists() && !doc.getString("username").isNullOrEmpty()) {
+                        doc.getString("username")!!
+                    } else {
+                        fallbackUsername
+                    }
+
                     val profile = UserProfile(
                         uid = uid,
-                        username = username,
-                        email = firebaseUser?.email ?: userEmail,
-                        status = "Online",
-                        lastActiveTimestamp = System.currentTimeMillis()
-                    )
-                    db?.collection("users")?.document(uid)?.set(profile, SetOptions.merge())
-                    saveSessionPreferences(context, uid, firebaseUser?.email ?: userEmail, username)
-                    onResult(true, "Signed in with Google as $username!")
-                }
-                .addOnFailureListener {
-                    val uid = getCurrentUser()?.uid ?: ("google_" + System.currentTimeMillis())
-                    val profile = UserProfile(
-                        uid = uid,
-                        username = username,
+                        username = finalUsername,
                         email = userEmail,
                         status = "Online",
                         lastActiveTimestamp = System.currentTimeMillis()
                     )
-                    db?.collection("users")?.document(uid)?.set(profile, SetOptions.merge())
-                    saveSessionPreferences(context, uid, userEmail, username)
-                    onResult(true, "Signed in as $username!")
+                    db.collection("users").document(uid).set(profile, SetOptions.merge())
+                    saveSessionPreferences(context, uid, userEmail, finalUsername)
+                    onResult(true, "Signed in as $finalUsername!")
+                }
+                .addOnFailureListener {
+                    saveSessionPreferences(context, uid, userEmail, fallbackUsername)
+                    onResult(true, "Signed in as $fallbackUsername!")
                 }
         } else {
-            val uid = getCurrentUser()?.uid ?: ("google_" + System.currentTimeMillis())
-            val profile = UserProfile(
-                uid = uid,
-                username = username,
-                email = userEmail,
-                status = "Online",
-                lastActiveTimestamp = System.currentTimeMillis()
-            )
-            db?.collection("users")?.document(uid)?.set(profile, SetOptions.merge())
-            saveSessionPreferences(context, uid, userEmail, username)
-            onResult(true, "Signed in as $username!")
+            saveSessionPreferences(context, uid, userEmail, fallbackUsername)
+            onResult(true, "Signed in as $fallbackUsername!")
         }
     }
 
@@ -250,33 +242,43 @@ object FirebaseUserManager {
             }
     }
 
+    fun getFriendshipId(uid1: String, uid2: String): String {
+        return if (uid1 < uid2) "${uid1}_${uid2}" else "${uid2}_${uid1}"
+    }
+
+    fun getActiveUid(context: Context): String? {
+        val user = getCurrentUser()
+        if (user != null) return user.uid
+        val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
+        return prefs.getString("local_uid", null)
+    }
+
     fun updatePresence(context: Context, isOnline: Boolean, customStatus: String? = null) {
         val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
-        val statusText = if (!isOnline) {
-            "Offline"
-        } else {
-            customStatus ?: prefs.getString("local_status", "Online") ?: "Online"
-        }
+        val broadcastEnabled = prefs.getBoolean("broadcast_status_enabled", true)
 
-        val now = System.currentTimeMillis()
+        val forceOffline = !broadcastEnabled || !isOnline || customStatus?.equals("Offline", ignoreCase = true) == true
+        val statusText = if (forceOffline) "Offline" else (customStatus ?: "Online")
+        val now = if (forceOffline) 0L else System.currentTimeMillis()
+
         prefs.edit()
             .putString("local_status", statusText)
             .putLong("last_active_timestamp", now)
             .apply()
 
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
-        if (user != null && db != null) {
+        if (!activeUid.isNullOrEmpty() && db != null) {
             val updates = mutableMapOf<String, Any>(
                 "status" to statusText,
                 "lastActiveTimestamp" to now
             )
-            if (!isOnline || statusText.equals("Offline", ignoreCase = true)) {
+            if (forceOffline) {
                 updates["nowPlayingTitle"] = ""
                 updates["nowPlayingArtist"] = ""
                 updates["nowPlayingArtUrl"] = ""
             }
-            db.collection("users").document(user.uid).update(updates)
+            db.collection("users").document(activeUid).update(updates)
         }
     }
 
@@ -284,10 +286,10 @@ object FirebaseUserManager {
         val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
         prefs.edit().putString("local_username", newUsername).apply()
 
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
-        if (user != null && db != null) {
-            db.collection("users").document(user.uid)
+        if (!activeUid.isNullOrEmpty() && db != null) {
+            db.collection("users").document(activeUid)
                 .update("username", newUsername)
                 .addOnSuccessListener { onResult?.invoke(true) }
                 .addOnFailureListener { onResult?.invoke(false) }
@@ -300,15 +302,22 @@ object FirebaseUserManager {
         val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
         prefs.edit().putString("local_avatar_url", avatarUrl ?: "").apply()
 
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
-        if (user != null && db != null) {
-            db.collection("users").document(user.uid).update("avatarUrl", avatarUrl ?: "")
+        if (!activeUid.isNullOrEmpty() && db != null) {
+            db.collection("users").document(activeUid).update("avatarUrl", avatarUrl ?: "")
         }
     }
 
     fun updateNowPlaying(context: Context, title: String?, artist: String?, artUrl: String? = null) {
         val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
+        val broadcastEnabled = prefs.getBoolean("broadcast_status_enabled", true)
+
+        if (!broadcastEnabled) {
+            updatePresence(context, isOnline = false, customStatus = "Offline")
+            return
+        }
+
         val statusText = if (title.isNullOrEmpty()) "Online" else "Listening to $title"
         prefs.edit()
             .putString("local_status", statusText)
@@ -316,9 +325,9 @@ object FirebaseUserManager {
             .putString("now_playing_artist", artist ?: "")
             .apply()
 
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
-        if (user != null && db != null) {
+        if (!activeUid.isNullOrEmpty() && db != null) {
             val updates = mutableMapOf<String, Any>(
                 "status" to statusText,
                 "nowPlayingTitle" to (title ?: ""),
@@ -329,7 +338,7 @@ object FirebaseUserManager {
             } else if (title.isNullOrEmpty()) {
                 updates["nowPlayingArtUrl"] = ""
             }
-            db.collection("users").document(user.uid).update(updates)
+            db.collection("users").document(activeUid).update(updates)
         }
     }
 
@@ -358,12 +367,21 @@ object FirebaseUserManager {
     }
 
     fun signOut(context: Context) {
+        val activeUid = getActiveUid(context)
+        val db = getDb()
+        if (!activeUid.isNullOrEmpty() && db != null) {
+            val updates = mapOf<String, Any>(
+                "status" to "Offline",
+                "nowPlayingTitle" to "",
+                "nowPlayingArtist" to "",
+                "nowPlayingArtUrl" to ""
+            )
+            db.collection("users").document(activeUid).update(updates)
+        }
+
         try { getAuth()?.signOut() } catch (_: Exception) {}
         val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
-        prefs.edit()
-            .putBoolean("is_logged_in", false)
-            .remove("local_uid")
-            .apply()
+        prefs.edit().clear().apply()
     }
 
     fun getLocalProfile(context: Context): UserProfile? {
@@ -415,10 +433,10 @@ object FirebaseUserManager {
         val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
         prefs.edit().putBoolean("allow_friend_requests", allowRequests).apply()
 
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
-        if (user != null && db != null) {
-            db.collection("users").document(user.uid).update("allowFriendRequests", allowRequests)
+        if (!activeUid.isNullOrEmpty() && db != null) {
+            db.collection("users").document(activeUid).update("allowFriendRequests", allowRequests)
         }
     }
 
@@ -469,6 +487,10 @@ object FirebaseUserManager {
                             status = "PENDING"
                         )
 
+                        // Clear old deletion markers when a new friend request is sent
+                        db.collection("friend_deletions").document("${user.uid}_$targetUid").delete()
+                        db.collection("friend_deletions").document("${targetUid}_${user.uid}").delete()
+
                         db.collection("friend_requests").document(reqId)
                             .set(request)
                             .addOnSuccessListener { onResult(true, "Friend request sent to $cleanTargetName!") }
@@ -494,24 +516,33 @@ object FirebaseUserManager {
         }
     }
 
-    fun acceptFriendRequest(request: FriendRequest, onResult: (Boolean) -> Unit) {
-        val user = getCurrentUser()
+    fun acceptFriendRequest(context: Context, request: FriendRequest, onResult: (Boolean) -> Unit) {
+        val activeUid = getActiveUid(context)
         val db = getDb()
-        if (user != null && db != null) {
-            db.collection("friend_requests").document(request.requestId)
-                .update("status", "ACCEPTED")
-                .addOnSuccessListener {
-                    db.collection("users").document(user.uid)
-                        .collection("friends").document(request.senderUid)
-                        .set(mapOf("uid" to request.senderUid, "timestamp" to System.currentTimeMillis()))
+        if (!activeUid.isNullOrEmpty() && db != null) {
+            val u1 = activeUid
+            val u2 = request.senderUid
+            val fid = getFriendshipId(u1, u2)
 
-                    db.collection("users").document(request.senderUid)
-                        .collection("friends").document(user.uid)
-                        .set(mapOf("uid" to user.uid, "timestamp" to System.currentTimeMillis()))
+            db.collection("friend_requests").document(request.requestId).delete()
 
-                    onResult(true)
-                }
-                .addOnFailureListener { onResult(false) }
+            val friendshipData = mapOf(
+                "userA" to u1,
+                "userB" to u2,
+                "users" to listOf(u1, u2),
+                "timestamp" to System.currentTimeMillis()
+            )
+
+            db.collection("friendships").document(fid).set(friendshipData, SetOptions.merge())
+
+            db.collection("users").document(u1).collection("friends").document(u2).set(mapOf("uid" to u2, "timestamp" to System.currentTimeMillis()))
+            db.collection("users").document(u2).collection("friends").document(u1).set(mapOf("uid" to u1, "timestamp" to System.currentTimeMillis()))
+
+            db.collection("friend_deletions").document(fid).delete()
+            db.collection("friend_deletions").document("${u1}_${u2}").delete()
+            db.collection("friend_deletions").document("${u2}_${u1}").delete()
+
+            onResult(true)
         } else {
             onResult(true)
         }
@@ -530,29 +561,79 @@ object FirebaseUserManager {
     }
 
     fun removeFriend(context: Context, friendUid: String, friendUsername: String, onResult: (Boolean) -> Unit) {
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
 
-        if (user != null && db != null) {
-            db.collection("users").document(user.uid)
-                .collection("friends").document(friendUid)
-                .delete()
-                .addOnSuccessListener {
-                    db.collection("users").document(friendUid)
-                        .collection("friends").document(user.uid)
-                        .delete()
-                    onResult(true)
-                }
-                .addOnFailureListener { onResult(false) }
-        } else {
-            val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
-            val friendsStr = prefs.getString("friends_list", "") ?: ""
-            if (friendsStr.isNotEmpty()) {
-                val updatedList = friendsStr.split(",")
-                    .filter { !it.equals(friendUsername, ignoreCase = true) }
-                    .joinToString(",")
-                prefs.edit().putString("friends_list", updatedList).apply()
+        val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
+        val friendsStr = prefs.getString("friends_list", "") ?: ""
+        if (friendsStr.isNotEmpty() && friendUsername.isNotEmpty()) {
+            val updatedList = friendsStr.split(",")
+                .filter { !it.equals(friendUsername, ignoreCase = true) }
+                .joinToString(",")
+            prefs.edit().putString("friends_list", updatedList).apply()
+        }
+
+        if (!activeUid.isNullOrEmpty() && db != null) {
+            val batch = db.batch()
+
+            if (friendUid.isNotEmpty()) {
+                val fid = getFriendshipId(activeUid, friendUid)
+                batch.delete(db.collection("friendships").document(fid))
+                batch.delete(db.collection("users").document(activeUid).collection("friends").document(friendUid))
+                batch.delete(db.collection("friend_requests").document("${activeUid}_${friendUid}"))
+                batch.delete(db.collection("friend_requests").document("${friendUid}_${activeUid}"))
+
+                val markerRef = db.collection("friend_deletions").document("${activeUid}_${friendUid}")
+                val marker = mapOf("userA" to activeUid, "userB" to friendUid, "timestamp" to System.currentTimeMillis())
+                batch.set(markerRef, marker)
             }
+
+            if (friendUsername.isNotEmpty()) {
+                db.collection("users")
+                    .whereEqualTo("username", friendUsername)
+                    .get()
+                    .addOnSuccessListener { snapshot ->
+                        val innerBatch = db.batch()
+                        for (doc in snapshot.documents) {
+                            val targetUid = doc.id
+                            val fid = getFriendshipId(activeUid, targetUid)
+
+                            innerBatch.delete(db.collection("friendships").document(fid))
+                            innerBatch.delete(db.collection("users").document(activeUid).collection("friends").document(targetUid))
+                            innerBatch.delete(db.collection("friend_requests").document("${activeUid}_${targetUid}"))
+                            innerBatch.delete(db.collection("friend_requests").document("${targetUid}_${activeUid}"))
+
+                            val markerRef = db.collection("friend_deletions").document("${activeUid}_${targetUid}")
+                            val marker = mapOf("userA" to activeUid, "userB" to targetUid, "timestamp" to System.currentTimeMillis())
+                            innerBatch.set(markerRef, marker)
+                        }
+
+                        innerBatch.commit()
+                            .addOnSuccessListener {
+                                android.util.Log.d("FirebaseUserManager", "Friend deletion batch committed successfully")
+                                onResult(true)
+                            }
+                            .addOnFailureListener { e ->
+                                android.util.Log.e("FirebaseUserManager", "Friend deletion batch failed: ${e.localizedMessage}")
+                                onResult(true)
+                            }
+                    }
+                    .addOnFailureListener { e ->
+                        android.util.Log.e("FirebaseUserManager", "Failed to find friend user: ${e.localizedMessage}")
+                        batch.commit().addOnCompleteListener { onResult(true) }
+                    }
+            } else {
+                batch.commit()
+                    .addOnSuccessListener {
+                        android.util.Log.d("FirebaseUserManager", "Friend deletion batch committed successfully")
+                        onResult(true)
+                    }
+                    .addOnFailureListener { e ->
+                        android.util.Log.e("FirebaseUserManager", "Friend deletion batch failed: ${e.localizedMessage}")
+                        onResult(true)
+                    }
+            }
+        } else {
             onResult(true)
         }
     }
@@ -576,22 +657,32 @@ object FirebaseUserManager {
         }
     }
 
+    private var innerFriendsListenerRegistration: ListenerRegistration? = null
+
     fun listenToFriendsList(context: Context, onUpdate: (List<UserProfile>) -> Unit): ListenerRegistration? {
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
 
-        if (user != null && db != null) {
-            return db.collection("users").document(user.uid)
-                .collection("friends")
+        if (!activeUid.isNullOrEmpty() && db != null) {
+            return db.collection("friendships")
+                .whereArrayContains("users", activeUid)
                 .addSnapshotListener { snapshot, _ ->
+                    innerFriendsListenerRegistration?.remove()
+                    innerFriendsListenerRegistration = null
+
                     if (snapshot != null) {
-                        val friendUids = snapshot.documents.map { it.id }
+                        val friendUids = snapshot.documents.mapNotNull { doc ->
+                            @Suppress("UNCHECKED_CAST")
+                            val usersList = doc.get("users") as? List<String>
+                            usersList?.firstOrNull { it != activeUid }
+                        }.distinct()
+
                         if (friendUids.isEmpty()) {
                             onUpdate(emptyList())
                             return@addSnapshotListener
                         }
 
-                        db.collection("users")
+                        innerFriendsListenerRegistration = db.collection("users")
                             .whereIn(com.google.firebase.firestore.FieldPath.documentId(), friendUids.take(10))
                             .addSnapshotListener { userSnap, _ ->
                                 if (userSnap != null) {
@@ -600,8 +691,9 @@ object FirebaseUserManager {
                                         doc.toObject(UserProfile::class.java)?.copy(uid = doc.id)
                                     }
                                     val evaluatedProfiles = rawProfiles.map { prof ->
-                                        val isStale = (currentNow - prof.lastActiveTimestamp) > 35_000
-                                        if (isStale || prof.status.equals("Offline", ignoreCase = true)) {
+                                        val isStale = (currentNow - prof.lastActiveTimestamp) > 25_000
+                                        val isOfflineStatus = prof.status.equals("Offline", ignoreCase = true) || prof.status.contains("Offline", ignoreCase = true)
+                                        if (isStale || isOfflineStatus) {
                                             prof.copy(
                                                 status = "Offline",
                                                 nowPlayingTitle = null,
@@ -615,6 +707,8 @@ object FirebaseUserManager {
                                     onUpdate(evaluatedProfiles)
                                 }
                             }
+                    } else {
+                        onUpdate(emptyList())
                     }
                 }
         } else {

@@ -426,44 +426,6 @@
                         android:layout_marginBottom="10dp"
                         android:background="#22FFFFFF" />
 
-                    <!-- Setting 3: Share Profile & Friend Code -->
-                    <LinearLayout
-                        android:id="@+id/btnShareProfileLink"
-                        android:layout_width="match_parent"
-                        android:layout_height="40dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="4dp"
-                        android:paddingEnd="4dp">
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Share Profile &amp; Invite Link"
-                            android:textColor="@color/white"
-                            android:textSize="13sp"
-                            android:textStyle="bold" />
-
-                        <ImageView
-                            android:layout_width="20dp"
-                            android:layout_height="20dp"
-                            android:contentDescription="@null"
-                            android:src="@drawable/baseline_share_24"
-                            app:tint="@color/light_gray" />
-
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginTop="4dp"
-                        android:layout_marginBottom="10dp"
-                        android:background="#22FFFFFF" />
-
                     <!-- Setting 4: Sign Out -->
                     <LinearLayout
                         android:id="@+id/btnSignOut"
@@ -549,11 +511,12 @@
                 android:visibility="gone">
 
                 <TextView
+                    android:id="@+id/textPendingRequestsHeader"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="6dp"
                     android:text="Pending Friend Requests"
-                    android:textColor="#FFBA00"
+                    android:textColor="@color/white"
                     android:textSize="12sp"
                     android:textStyle="bold" />
 

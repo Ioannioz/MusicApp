@@ -330,13 +330,34 @@ class AudioService : Service() {
         return if (isShuffle && shuffledList.isNotEmpty()) shuffledList else songList
     }
 
+    private var currentSongListenMs = 0L
+    private var hasCountedPlayForCurrentSong = false
+    private var trackedSongId = -1L
+
     private val statsHandler = Handler(Looper.getMainLooper())
     private val statsRunnable = object : Runnable {
         override fun run() {
             if (player?.isPlaying == true) {
-                com.example.myapplication.model.StatsManager.addPlaybackTime(this@AudioService, 3)
+                com.example.myapplication.model.StatsManager.addPlaybackTime(this@AudioService, 1)
+
+                val activeSong = getCurrentSong()
+                if (activeSong != null) {
+                    if (trackedSongId != activeSong.id) {
+                        trackedSongId = activeSong.id
+                        currentSongListenMs = 0L
+                        hasCountedPlayForCurrentSong = false
+                    }
+
+                    currentSongListenMs += 1000L
+
+                    // Count play for stats ONLY after 15 seconds of active listening!
+                    if (!hasCountedPlayForCurrentSong && currentSongListenMs >= 15_000L) {
+                        hasCountedPlayForCurrentSong = true
+                        com.example.myapplication.model.StatsManager.recordSongPlay(this@AudioService, activeSong.id)
+                    }
+                }
             }
-            statsHandler.postDelayed(this, 3000)
+            statsHandler.postDelayed(this, 1000)
         }
     }
 
@@ -439,8 +460,6 @@ class AudioService : Service() {
         currentIndex = index
         lastSelectedListIndex = index
         val song = list[index]
-
-        com.example.myapplication.model.StatsManager.recordSongPlay(this, song.id)
 
         player?.let { p ->
             val mediaItem = createMediaItem(song)

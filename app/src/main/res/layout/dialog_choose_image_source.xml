@@ -106,7 +106,7 @@
                 android:layout_height="32dp"
                 android:layout_marginEnd="16dp"
                 android:contentDescription="@null"
-                android:src="@drawable/baseline_edit_24"
+                android:src="@drawable/baseline_language_24"
                 app:tint="@color/white" />
 
             <LinearLayout

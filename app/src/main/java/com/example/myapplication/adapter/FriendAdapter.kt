@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.core.graphics.ColorUtils
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.myapplication.R
@@ -33,6 +34,32 @@ class FriendAdapter(
         val textTrackArtist: TextView = itemView.findViewById(R.id.textFriendTrackArtist)
     }
 
+    fun updateFriends(newFriends: List<UserProfile>) {
+        val oldList = friends
+        val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = oldList.size
+            override fun getNewListSize(): Int = newFriends.size
+
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                return oldList[oldItemPosition].uid == newFriends[newItemPosition].uid
+            }
+
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                val o = oldList[oldItemPosition]
+                val n = newFriends[newItemPosition]
+                return o.uid == n.uid &&
+                        o.username == n.username &&
+                        o.status == n.status &&
+                        o.avatarUrl == n.avatarUrl &&
+                        o.nowPlayingTitle == n.nowPlayingTitle &&
+                        o.nowPlayingArtist == n.nowPlayingArtist &&
+                        o.nowPlayingArtUrl == n.nowPlayingArtUrl
+            }
+        })
+        this.friends = newFriends
+        diffResult.dispatchUpdatesTo(this)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FriendViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_friend_activity, parent, false)
         return FriendViewHolder(view)
@@ -46,27 +73,37 @@ class FriendAdapter(
 
         holder.cardView.setCardBackgroundColor(cardColor)
 
-        // Load friend's avatar securely (Base64 decode or URL)
-        val avatarUrl = friend.avatarUrl
-        if (!avatarUrl.isNullOrEmpty()) {
-            if (avatarUrl.startsWith("data:image") || avatarUrl.length > 100) {
-                val avatarBitmap = ImageUtils.decodeBase64ToBitmap(avatarUrl)
-                if (avatarBitmap != null) {
+        // Load friend's avatar securely without flicker
+        val avatarUrl = friend.avatarUrl ?: ""
+        val lastAvatarTag = holder.imgAvatar.getTag(R.id.imgFriendAvatar) as? String
+
+        if (lastAvatarTag != avatarUrl) {
+            holder.imgAvatar.setTag(R.id.imgFriendAvatar, avatarUrl)
+            if (avatarUrl.isNotEmpty()) {
+                holder.imgAvatar.imageTintList = null
+                holder.imgAvatar.clearColorFilter()
+                if (avatarUrl.startsWith("data:image") || avatarUrl.length > 100) {
+                    val avatarBitmap = ImageUtils.decodeBase64ToBitmap(avatarUrl)
+                    if (avatarBitmap != null) {
+                        Glide.with(context)
+                            .load(avatarBitmap)
+                            .dontAnimate()
+                            .placeholder(R.drawable.baseline_account_circle_24)
+                            .into(holder.imgAvatar)
+                    } else {
+                        holder.imgAvatar.setImageResource(R.drawable.baseline_account_circle_24)
+                    }
+                } else {
                     Glide.with(context)
-                        .load(avatarBitmap)
+                        .load(avatarUrl)
+                        .dontAnimate()
                         .placeholder(R.drawable.baseline_account_circle_24)
                         .into(holder.imgAvatar)
-                } else {
-                    holder.imgAvatar.setImageResource(R.drawable.baseline_account_circle_24)
                 }
             } else {
-                Glide.with(context)
-                    .load(avatarUrl)
-                    .placeholder(R.drawable.baseline_account_circle_24)
-                    .into(holder.imgAvatar)
+                holder.imgAvatar.setTag(R.id.imgFriendAvatar, null)
+                holder.imgAvatar.setImageResource(R.drawable.baseline_account_circle_24)
             }
-        } else {
-            holder.imgAvatar.setImageResource(R.drawable.baseline_account_circle_24)
         }
 
         holder.textName.text = friend.username
@@ -96,27 +133,35 @@ class FriendAdapter(
                 holder.textTrackArtist.text = friend.nowPlayingArtist ?: ""
                 holder.textTrackArtist.setTextColor(Color.parseColor("#B3B3B3"))
 
-                // Load friend's active track album art securely (Base64 decode or URL)
-                val artUrl = friend.nowPlayingArtUrl
-                if (!artUrl.isNullOrEmpty()) {
-                    if (artUrl.startsWith("data:image") || artUrl.length > 100) {
-                        val artBitmap = ImageUtils.decodeBase64ToBitmap(artUrl)
-                        if (artBitmap != null) {
+                // Load friend's active track album art securely without flicker
+                val artUrl = friend.nowPlayingArtUrl ?: ""
+                val lastArtTag = holder.imgTrackArt.getTag(R.id.imgFriendTrackArt) as? String
+
+                if (lastArtTag != artUrl) {
+                    holder.imgTrackArt.setTag(R.id.imgFriendTrackArt, artUrl)
+                    if (artUrl.isNotEmpty()) {
+                        if (artUrl.startsWith("data:image") || artUrl.length > 100) {
+                            val artBitmap = ImageUtils.decodeBase64ToBitmap(artUrl)
+                            if (artBitmap != null) {
+                                Glide.with(context)
+                                    .load(artBitmap)
+                                    .dontAnimate()
+                                    .placeholder(R.drawable.baseline_music_note_24)
+                                    .into(holder.imgTrackArt)
+                            } else {
+                                holder.imgTrackArt.setImageResource(R.drawable.baseline_music_note_24)
+                            }
+                        } else {
                             Glide.with(context)
-                                .load(artBitmap)
+                                .load(artUrl)
+                                .dontAnimate()
                                 .placeholder(R.drawable.baseline_music_note_24)
                                 .into(holder.imgTrackArt)
-                        } else {
-                            holder.imgTrackArt.setImageResource(R.drawable.baseline_music_note_24)
                         }
                     } else {
-                        Glide.with(context)
-                            .load(artUrl)
-                            .placeholder(R.drawable.baseline_music_note_24)
-                            .into(holder.imgTrackArt)
+                        holder.imgTrackArt.setTag(R.id.imgFriendTrackArt, null)
+                        holder.imgTrackArt.setImageResource(R.drawable.baseline_music_note_24)
                     }
-                } else {
-                    holder.imgTrackArt.setImageResource(R.drawable.baseline_music_note_24)
                 }
             } else {
                 holder.layoutTrack.visibility = View.GONE

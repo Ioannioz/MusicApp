@@ -238,19 +238,42 @@ class SongsFragment : Fragment(), SongAdapter.OnItemClickListener, SongAdapter.O
 
     private fun setupSearch() {
         binding.btnSearch.setOnClickListener {
+            val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
             if (binding.searchBarContainer.visibility == View.VISIBLE) {
+                imm?.hideSoftInputFromWindow(binding.editSearchSongs.windowToken, 0)
+                binding.editSearchSongs.clearFocus()
                 binding.searchBarContainer.visibility = View.GONE
                 binding.editSearchSongs.setText("")
             } else {
                 binding.searchBarContainer.visibility = View.VISIBLE
                 binding.editSearchSongs.requestFocus()
                 com.example.myapplication.util.DialogThemeHelper.styleSearchContainer(binding.searchBarContainer, requireContext())
+                binding.editSearchSongs.postDelayed({
+                    imm?.showSoftInput(binding.editSearchSongs, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                }, 100)
             }
         }
 
         binding.btnCloseSearch.setOnClickListener {
+            val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+            imm?.hideSoftInputFromWindow(binding.editSearchSongs.windowToken, 0)
+            binding.editSearchSongs.clearFocus()
             binding.editSearchSongs.setText("")
             binding.searchBarContainer.visibility = View.GONE
+        }
+
+        binding.editSearchSongs.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH ||
+                actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE ||
+                actionId == android.view.inputmethod.EditorInfo.IME_NULL
+            ) {
+                val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
+                imm?.hideSoftInputFromWindow(binding.editSearchSongs.windowToken, 0)
+                binding.editSearchSongs.clearFocus()
+                true
+            } else {
+                false
+            }
         }
 
         binding.editSearchSongs.addTextChangedListener(object : android.text.TextWatcher {

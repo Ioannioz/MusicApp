@@ -5,9 +5,12 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import android.util.LruCache
 import java.io.ByteArrayOutputStream
 
 object ImageUtils {
+
+    private val bitmapCache = LruCache<String, Bitmap>(30)
 
     fun bitmapToBase64(bitmap: Bitmap, quality: Int = 75): String {
         val outputStream = ByteArrayOutputStream()
@@ -29,10 +32,20 @@ object ImageUtils {
 
     fun decodeBase64ToBitmap(base64Str: String?): Bitmap? {
         if (base64Str.isNullOrEmpty()) return null
+
+        val cached = bitmapCache.get(base64Str)
+        if (cached != null && !cached.isRecycled) {
+            return cached
+        }
+
         return try {
             val cleanBase64 = if (base64Str.contains(",")) base64Str.substringAfter(",") else base64Str
             val decodedBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            val decodedBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+            if (decodedBitmap != null) {
+                bitmapCache.put(base64Str, decodedBitmap)
+            }
+            decodedBitmap
         } catch (_: Exception) {
             null
         }
