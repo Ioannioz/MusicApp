@@ -392,6 +392,7 @@ object FirebaseUserManager {
         val uid = prefs.getString("local_uid", "local_user") ?: "local_user"
         val email = prefs.getString("local_email", "user@example.com") ?: "user@example.com"
         val username = prefs.getString("local_username", email.substringBefore("@")) ?: "User"
+        val avatarUrl = prefs.getString("local_avatar_url", null)
         val status = prefs.getString("local_status", "Online") ?: "Online"
         val title = prefs.getString("now_playing_title", null)
         val artist = prefs.getString("now_playing_artist", null)
@@ -400,6 +401,7 @@ object FirebaseUserManager {
             uid = uid,
             username = username,
             email = email,
+            avatarUrl = avatarUrl,
             status = status,
             nowPlayingTitle = title,
             nowPlayingArtist = artist
@@ -407,13 +409,18 @@ object FirebaseUserManager {
     }
 
     fun fetchCurrentProfile(context: Context, onResult: (UserProfile?) -> Unit) {
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
-        if (user != null && db != null) {
-            db.collection("users").document(user.uid).get()
+        if (!activeUid.isNullOrEmpty() && db != null) {
+            db.collection("users").document(activeUid).get()
                 .addOnSuccessListener { doc ->
                     if (doc.exists()) {
-                        onResult(doc.toObject(UserProfile::class.java))
+                        val profile = doc.toObject(UserProfile::class.java)
+                        if (!profile?.avatarUrl.isNullOrEmpty()) {
+                            context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
+                                .edit().putString("local_avatar_url", profile?.avatarUrl).apply()
+                        }
+                        onResult(profile)
                     } else {
                         onResult(getLocalProfile(context))
                     }
