@@ -707,55 +707,65 @@ object FirebaseUserManager {
         val db = getDb()
 
         if (!activeUid.isNullOrEmpty() && db != null) {
-            return db.collection("friendships")
-                .whereArrayContains("users", activeUid)
-                .addSnapshotListener { snapshot, _ ->
+            return db.collection("users").document(activeUid)
+                .collection("friends")
+                .addSnapshotListener { subSnap, _ ->
+                    val subUids = subSnap?.documents?.map { it.id } ?: emptyList()
+
                     innerFriendsListenerRegistration?.remove()
                     innerFriendsListenerRegistration = null
 
-                    if (snapshot != null) {
-                        val friendUids = snapshot.documents.mapNotNull { doc ->
-                            @Suppress("UNCHECKED_CAST")
-                            val usersList = doc.get("users") as? List<String>
-                            usersList?.firstOrNull { it != activeUid }
-                        }.distinct()
-
-                        if (friendUids.isEmpty()) {
-                            onUpdate(emptyList())
-                            return@addSnapshotListener
-                        }
-
-                        innerFriendsListenerRegistration = db.collection("users")
-                            .whereIn(com.google.firebase.firestore.FieldPath.documentId(), friendUids.take(10))
-                            .addSnapshotListener { userSnap, _ ->
-                                if (userSnap != null) {
-                                    val currentNow = System.currentTimeMillis()
-                                    val profileMap = userSnap.documents.mapNotNull { doc ->
-                                        doc.toObject(UserProfile::class.java)?.copy(uid = doc.id)
-                                    }.associateBy { it.uid }
-
-                                    val rawProfiles = friendUids.mapNotNull { uid -> profileMap[uid] }
-
-                                    val evaluatedProfiles = rawProfiles.map { prof ->
-                                        val isStale = (currentNow - prof.lastActiveTimestamp) > 25_000
-                                        val isOfflineStatus = prof.status.equals("Offline", ignoreCase = true) || prof.status.contains("Offline", ignoreCase = true)
-                                        if (isStale || isOfflineStatus) {
-                                            prof.copy(
-                                                status = "Offline",
-                                                nowPlayingTitle = null,
-                                                nowPlayingArtist = null,
-                                                nowPlayingArtUrl = null
-                                            )
-                                        } else {
-                                            prof.copy(status = "Online")
-                                        }
-                                    }
-                                    onUpdate(evaluatedProfiles)
-                                }
+                    db.collection("friendships")
+                        .whereArrayContains("users", activeUid)
+                        .get()
+                        .addOnSuccessListener { fidSnap ->
+                            val fidUids = fidSnap.documents.mapNotNull { doc ->
+                                @Suppress("UNCHECKED_CAST")
+                                val usersList = doc.get("users") as? List<String>
+                                usersList?.firstOrNull { it != activeUid }
                             }
-                    } else {
-                        onUpdate(emptyList())
-                    }
+
+                            val combinedUids = (subUids + fidUids).distinct()
+
+                            if (combinedUids.isEmpty()) {
+                                onUpdate(emptyList())
+                                return@addOnSuccessListener
+                            }
+
+                            innerFriendsListenerRegistration = db.collection("users")
+                                .whereIn(com.google.firebase.firestore.FieldPath.documentId(), combinedUids.take(10))
+                                .addSnapshotListener { userSnap, _ ->
+                                    if (userSnap != null) {
+                                        val currentNow = System.currentTimeMillis()
+                                        val profileMap = userSnap.documents.mapNotNull { doc ->
+                                            doc.toObject(UserProfile::class.java)?.copy(uid = doc.id)
+                                        }.associateBy { it.uid }
+
+                                        val rawProfiles = combinedUids.mapNotNull { uid -> profileMap[uid] }
+
+                                        val evaluatedProfiles = rawProfiles.map { prof ->
+                                            val isStale = (currentNow - prof.lastActiveTimestamp) > 25_000
+                                            val isOfflineStatus = prof.status.equals("Offline", ignoreCase = true) || prof.status.contains("Offline", ignoreCase = true)
+                                            if (isStale || isOfflineStatus) {
+                                                prof.copy(
+                                                    status = "Offline",
+                                                    nowPlayingTitle = null,
+                                                    nowPlayingArtist = null,
+                                                    nowPlayingArtUrl = null
+                                                )
+                                            } else {
+                                                prof.copy(status = "Online")
+                                            }
+                                        }
+                                        onUpdate(evaluatedProfiles)
+                                    }
+                                }
+                        }
+                        .addOnFailureListener {
+                            if (subUids.isEmpty()) {
+                                onUpdate(emptyList())
+                            }
+                        }
                 }
         } else {
             val prefs = context.getSharedPreferences(LOCAL_PREFS, Context.MODE_PRIVATE)
