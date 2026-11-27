@@ -220,25 +220,38 @@ object FirebaseUserManager {
         currentUid: String? = null,
         onResult: (Boolean, String) -> Unit
     ) {
-        val db = getDb()
         val cleanUsername = username.trim()
-        val activeUid = currentUid ?: getActiveUid(context)
-
         if (cleanUsername.isEmpty()) {
             onResult(false, "Username cannot be empty")
             return
         }
 
+        // If the user is submitting their current username, it is always available for them
+        val currentProfile = getLocalProfile(context)
+        if (currentProfile != null && cleanUsername.equals(currentProfile.username, ignoreCase = true)) {
+            onResult(true, "Username is available!")
+            return
+        }
+
+        val db = getDb()
         if (db == null) {
             onResult(true, "Username is available")
             return
         }
 
+        val activeUid = currentUid ?: getActiveUid(context)
+        val activeEmail = currentProfile?.email ?: ""
+
         db.collection("users")
             .whereEqualTo("username", cleanUsername)
             .get()
             .addOnSuccessListener { snapshot ->
-                val docs = snapshot.documents.filter { it.id != activeUid }
+                val docs = snapshot.documents.filter { doc ->
+                    val docUid = doc.id
+                    val docEmail = doc.getString("email") ?: ""
+                    docUid != activeUid && (activeEmail.isEmpty() || !docEmail.equals(activeEmail, ignoreCase = true))
+                }
+
                 if (docs.isEmpty()) {
                     onResult(true, "Username is available!")
                 } else {
@@ -456,7 +469,7 @@ object FirebaseUserManager {
     }
 
     fun sendFriendRequest(context: Context, targetUsername: String, onResult: (Boolean, String) -> Unit) {
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
         val cleanTargetName = targetUsername.trim()
 
@@ -465,9 +478,9 @@ object FirebaseUserManager {
             return
         }
 
-        if (user != null && db != null) {
+        if (!activeUid.isNullOrEmpty() && db != null) {
             fetchCurrentProfile(context) { currentProfile ->
-                val senderName = currentProfile?.username ?: user.email?.substringBefore("@") ?: "User"
+                val senderName = currentProfile?.username ?: getLocalProfile(context)?.username ?: "User"
 
                 db.collection("users")
                     .whereEqualTo("username", cleanTargetName)
@@ -488,23 +501,23 @@ object FirebaseUserManager {
                         }
 
                         val targetUid = targetDoc.id
-                        if (targetUid == user.uid) {
+                        if (targetUid == activeUid) {
                             onResult(false, "Cannot add yourself as friend")
                             return@addOnSuccessListener
                         }
 
-                        val reqId = "${user.uid}_$targetUid"
+                        val reqId = "${activeUid}_$targetUid"
                         val request = FriendRequest(
                             requestId = reqId,
-                            senderUid = user.uid,
+                            senderUid = activeUid,
                             senderUsername = senderName,
                             receiverUid = targetUid,
                             status = "PENDING"
                         )
 
                         // Clear old deletion markers when a new friend request is sent
-                        db.collection("friend_deletions").document("${user.uid}_$targetUid").delete()
-                        db.collection("friend_deletions").document("${targetUid}_${user.uid}").delete()
+                        db.collection("friend_deletions").document("${activeUid}_$targetUid").delete()
+                        db.collection("friend_deletions").document("${targetUid}_$activeUid").delete()
 
                         db.collection("friend_requests").document(reqId)
                             .set(request)
@@ -654,11 +667,11 @@ object FirebaseUserManager {
     }
 
     fun listenToPendingRequests(context: Context, onUpdate: (List<FriendRequest>) -> Unit): ListenerRegistration? {
-        val user = getCurrentUser()
+        val activeUid = getActiveUid(context)
         val db = getDb()
-        if (user != null && db != null) {
+        if (!activeUid.isNullOrEmpty() && db != null) {
             return db.collection("friend_requests")
-                .whereEqualTo("receiverUid", user.uid)
+                .whereEqualTo("receiverUid", activeUid)
                 .whereEqualTo("status", "PENDING")
                 .addSnapshotListener { snapshot, _ ->
                     if (snapshot != null) {
