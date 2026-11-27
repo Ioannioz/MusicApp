@@ -3,6 +3,8 @@ package com.example.myapplication.util
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.util.Base64
 import android.util.LruCache
@@ -19,11 +21,40 @@ object ImageUtils {
         return "data:image/jpeg;base64," + Base64.encodeToString(byteArray, Base64.NO_WRAP)
     }
 
+    private fun getExifRotationDegrees(context: Context, uri: Uri): Float {
+        return try {
+            val input = context.contentResolver.openInputStream(uri) ?: return 0f
+            val exif = ExifInterface(input)
+            val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            input.close()
+
+            when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
+            }
+        } catch (_: Exception) {
+            0f
+        }
+    }
+
     fun uriToBase64(context: Context, uri: Uri, targetSize: Int = 140): String? {
         return try {
+            val degrees = getExifRotationDegrees(context, uri)
+
             val input = context.contentResolver.openInputStream(uri) ?: return null
             val original = BitmapFactory.decodeStream(input) ?: return null
-            val scaled = Bitmap.createScaledBitmap(original, targetSize, targetSize, true)
+            input.close()
+
+            val rotated = if (degrees != 0f) {
+                val matrix = Matrix().apply { postRotate(degrees) }
+                Bitmap.createBitmap(original, 0, 0, original.width, original.height, matrix, true)
+            } else {
+                original
+            }
+
+            val scaled = Bitmap.createScaledBitmap(rotated, targetSize, targetSize, true)
             bitmapToBase64(scaled)
         } catch (_: Exception) {
             null
